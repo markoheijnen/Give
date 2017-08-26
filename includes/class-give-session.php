@@ -76,52 +76,22 @@ class Give_Session {
 		$this->use_php_sessions = $this->use_php_sessions();
 		$this->exp_option       = give_get_option( 'session_lifetime' );
 
-		// PHP Sessions.
-		if ( $this->use_php_sessions ) {
+		// Set prefix for multisite
+		if ( $this->use_php_sessions && is_multisite() ) {
 
-			if ( is_multisite() ) {
+			$this->prefix = '_' . get_current_blog_id();
 
-				$this->prefix = '_' . get_current_blog_id();
-
-			}
-
-			add_action( 'init', array( $this, 'maybe_start_session' ), - 2 );
-
-		} else {
-
-			if ( ! $this->should_start_session() ) {
-				return;
-			}
+		}
+		elseif ( ! $this->use_php_sessions  ) {
 
 			// Use WP_Session.
 			if ( ! defined( 'WP_SESSION_COOKIE' ) ) {
 				define( 'WP_SESSION_COOKIE', 'give_wp_session' );
 			}
 
-			if ( ! class_exists( 'Recursive_ArrayAccess' ) ) {
-				require_once GIVE_PLUGIN_DIR . 'includes/libraries/sessions/class-recursive-arrayaccess.php';
-			}
-
-			// Include utilities class
-			if ( ! class_exists( 'WP_Session_Utils' ) ) {
-				require_once GIVE_PLUGIN_DIR . 'includes/libraries/sessions/class-wp-session-utils.php';
-			}
-			if ( ! class_exists( 'WP_Session' ) ) {
-				require_once GIVE_PLUGIN_DIR . 'includes/libraries/sessions/class-wp-session.php';
-				require_once GIVE_PLUGIN_DIR . 'includes/libraries/sessions/wp-session.php';
-			}
-
-			add_filter( 'wp_session_expiration_variant', array( $this, 'set_expiration_variant_time' ), 99999 );
-			add_filter( 'wp_session_expiration', array( $this, 'set_expiration_time' ), 99999 );
-
 		}
 
-		// Init Session.
-		if ( empty( $this->session ) && ! $this->use_php_sessions ) {
-			add_action( 'plugins_loaded', array( $this, 'init' ), - 1 );
-		} else {
-			add_action( 'init', array( $this, 'init' ), - 1 );
-		}
+		add_action( 'wp', array( $this, 'maybe_start_session' ), - 2 );
 
 		// Set cookie on Donation Completion page.
 		add_action( 'give_pre_process_donation', array( $this, 'set_session_cookies' ) );
@@ -140,10 +110,35 @@ class Give_Session {
 	 */
 	public function init() {
 
+		// PHP Sessions.
 		if ( $this->use_php_sessions ) {
+
+			if ( ! session_id() && ! headers_sent() ) {
+				session_start();
+			}
+
 			$this->session = isset( $_SESSION[ 'give' . $this->prefix ] ) && is_array( $_SESSION[ 'give' . $this->prefix ] ) ? $_SESSION[ 'give' . $this->prefix ] : array();
+
 		} else {
+
+			if ( ! class_exists( 'Recursive_ArrayAccess' ) ) {
+				require_once GIVE_PLUGIN_DIR . 'includes/libraries/sessions/class-recursive-arrayaccess.php';
+			}
+
+			// Include utilities class
+			if ( ! class_exists( 'WP_Session_Utils' ) ) {
+				require_once GIVE_PLUGIN_DIR . 'includes/libraries/sessions/class-wp-session-utils.php';
+			}
+			if ( ! class_exists( 'WP_Session' ) ) {
+				require_once GIVE_PLUGIN_DIR . 'includes/libraries/sessions/class-wp-session.php';
+				require_once GIVE_PLUGIN_DIR . 'includes/libraries/sessions/wp-session.php';
+			}
+
+			add_filter( 'wp_session_expiration_variant', array( $this, 'set_expiration_variant_time' ), 99999 );
+			add_filter( 'wp_session_expiration', array( $this, 'set_expiration_time' ), 99999 );
+
 			$this->session = WP_Session::get_instance();
+
 		}
 
 		return $this->session;
@@ -321,9 +316,12 @@ class Give_Session {
 	 */
 	public function should_start_session() {
 
-		$start_session = true;
+		$start_session = false;
 
 		if ( ! empty( $_SERVER['REQUEST_URI'] ) ) {
+			if ( give_is_page() || $this->session_has_started() ) {
+				$start_session = true;
+			}
 
 			$blacklist = apply_filters( 'give_session_start_uri_blacklist', array(
 				'feed',
@@ -367,9 +365,23 @@ class Give_Session {
 			return;
 		}
 
-		if ( ! session_id() && ! headers_sent() ) {
-			session_start();
-		}
+		$this->init();
+
+	}
+
+	public function session_has_started() {
+
+		// PHP Sessions.
+		if (
+			( $this->use_php_sessions && $_COOKIE['PHPSESSID'] ) ||
+			( ! $this->use_php_sessions && $_COOKIE[WP_SESSION_COOKIE])
+		) {
+
+			return true;
+
+		} 
+
+		return false;
 
 	}
 

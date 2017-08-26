@@ -1279,3 +1279,20 @@ function give_get_completed_upgrades() {
 
 }
 
+
+/**
+ * Current page is a Give page
+ *
+ * @since  1.8.12
+ * @return array The array of completed upgrades
+ */
+function give_is_page() {
+
+	$post_types = array(
+		'give_forms',
+		'give_payment',
+	);
+
+	return is_post_type_archive( $post_types ) || is_singular( $post_types );
+
+}
