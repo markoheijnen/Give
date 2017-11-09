@@ -1287,12 +1287,69 @@ function give_get_completed_upgrades() {
  * @return array The array of completed upgrades
  */
 function give_is_page() {
+	global $post;
 
 	$post_types = array(
 		'give_forms',
 		'give_payment',
 	);
 
-	return is_post_type_archive( $post_types ) || is_singular( $post_types );
+	$post_taxs = array(
+		'give_forms_category',
+		'give_forms_tag',
+	);
 
+	$shortcodes = array(
+		'donation_history',
+		'give_form',
+		'give_goal',
+		'give_login',
+		'give_register',
+		'give_receipt',
+		'give_profile_editor',
+	);
+
+	if ( is_post_type_archive( $post_types ) || is_singular( $post_types ) || is_tax($post_taxs) ) {
+		return true;
+	}
+
+	return is_a( $post, 'WP_Post' ) && give_has_shortcode( $post->post_content, $shortcodes);
+}
+
+/**
+ * Copy of WordPress has_shortcode function with array_support
+ *
+ * @since  1.8.12
+ *
+ * @global array $shortcode_tags List of shortcode tags and their callback hooks.
+ *
+ * @param string|array $tag Shortcode tag to check.
+ * @return bool Whether the given shortcode exists.
+ */
+function give_has_shortcode( $content, $tags ) {
+	if ( false === strpos( $content, '[' ) ) {
+		return false;
+	}
+
+	if (!is_array($tags)) {
+		$tags = array($tags);
+	}
+
+	$tags = array_filter( $tags, 'shortcode_exists' );
+
+	if ( $tags ) {
+		preg_match_all( '/' . get_shortcode_regex() . '/', $content, $matches, PREG_SET_ORDER );
+		if ( empty( $matches ) )
+			return false;
+
+		foreach ( $matches as $shortcode ) {
+			if ( in_array($shortcode[2], $tags) ) {
+				return true;
+			} elseif ( ! empty( $shortcode[5] ) && give_has_shortcode( $shortcode[5], $tags ) ) {
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
