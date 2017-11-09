@@ -24,14 +24,8 @@
   #give-donors-filter {
 	position: relative;
 	p.search-box {
-	  float: left;
 	  margin: 0;
 	}
-  }
-
-  .tablenav.top {
-	float: right;
-	clear: none;
   }
 }
 
@@ -171,10 +165,14 @@
   font-weight: 600;
 }
 
-.disconnect-user a {
+#disconnect-donor {
   font-size: 12px;
   font-weight: normal;
   text-decoration: none;
+}
+
+#view-user-profile {
+  @extend #disconnect-donor;
 }
 
 #donor-edit-actions {

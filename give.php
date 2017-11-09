@@ -5,7 +5,7 @@
  * Description: The most robust, flexible, and intuitive way to accept donations on WordPress.
  * Author: WordImpress
  * Author URI: https://wordimpress.com
- * Version: 1.8.12
+ * Version: 1.8.16
  * Text Domain: give
  * Domain Path: /languages
  * GitHub Plugin URI: https://github.com/WordImpress/Give
@@ -180,7 +180,7 @@ if ( ! class_exists( 'Give' ) ) :
 		/**
 		 * Give notices Object
 		 *
-		 * @since  2.0
+		 * @since  1.8.9
 		 * @access public
 		 *
 		 * @var    Give_Notices $notices
@@ -324,7 +324,7 @@ if ( ! class_exists( 'Give' ) ) :
 
 			// Plugin version
 			if ( ! defined( 'GIVE_VERSION' ) ) {
-				define( 'GIVE_VERSION', '1.8.12' );
+				define( 'GIVE_VERSION', '1.8.16' );
 			}
 
 			// Plugin Folder Path
@@ -368,6 +368,7 @@ if ( ! class_exists( 'Give' ) ) :
 			require_once GIVE_PLUGIN_DIR . 'includes/admin/class-give-settings.php';
 			$give_options = give_get_settings();
 
+			require_once GIVE_PLUGIN_DIR . 'includes/class-give-cron.php';
 			require_once GIVE_PLUGIN_DIR . 'includes/admin/give-metabox-functions.php';
 			require_once GIVE_PLUGIN_DIR . 'includes/class-give-cache.php';
 			require_once GIVE_PLUGIN_DIR . 'includes/post-types.php';
@@ -390,12 +391,12 @@ if ( ! class_exists( 'Give' ) ) :
 			require_once GIVE_PLUGIN_DIR . 'includes/class-give-html-elements.php';
 			require_once GIVE_PLUGIN_DIR . 'includes/class-give-logging.php';
 			require_once GIVE_PLUGIN_DIR . 'includes/class-give-license-handler.php';
-			require_once GIVE_PLUGIN_DIR . 'includes/class-give-cron.php';
 			require_once GIVE_PLUGIN_DIR . 'includes/class-give-email-access.php';
 
 			require_once GIVE_PLUGIN_DIR . 'includes/country-functions.php';
 			require_once GIVE_PLUGIN_DIR . 'includes/template-functions.php';
 			require_once GIVE_PLUGIN_DIR . 'includes/misc-functions.php';
+			require_once GIVE_PLUGIN_DIR . 'includes/import-functions.php';
 			require_once GIVE_PLUGIN_DIR . 'includes/forms/functions.php';
 			require_once GIVE_PLUGIN_DIR . 'includes/forms/template.php';
 			require_once GIVE_PLUGIN_DIR . 'includes/forms/widget.php';
@@ -430,6 +431,8 @@ if ( ! class_exists( 'Give' ) ) :
 			require_once GIVE_PLUGIN_DIR . 'includes/emails/template.php';
 			require_once GIVE_PLUGIN_DIR . 'includes/emails/actions.php';
 
+			require_once GIVE_PLUGIN_DIR . 'includes/donors/class-give-donors-query.php';
+
 			if ( defined( 'WP_CLI' ) && WP_CLI ) {
 				require_once GIVE_PLUGIN_DIR . 'includes/class-give-cli-commands.php';
 			}
@@ -446,6 +449,7 @@ if ( ! class_exists( 'Give' ) ) :
 				require_once GIVE_PLUGIN_DIR . 'includes/admin/add-ons.php';
 				require_once GIVE_PLUGIN_DIR . 'includes/admin/plugins.php';
 				require_once GIVE_PLUGIN_DIR . 'includes/admin/dashboard-widgets.php';
+				require_once GIVE_PLUGIN_DIR . 'includes/admin/class-blank-slate.php';
 
 				require_once GIVE_PLUGIN_DIR . 'includes/admin/payments/actions.php';
 				require_once GIVE_PLUGIN_DIR . 'includes/admin/payments/payments-history.php';

@@ -37,7 +37,7 @@ function give_manual_payment( $purchase_data ) {
 	if ( ! wp_verify_nonce( $purchase_data['gateway_nonce'], 'give-gateway' ) ) {
 		wp_die( esc_html__( 'Nonce verification failed.', 'give' ), esc_html__( 'Error', 'give' ), array( 'response' => 403 ) );
 	}
-	
+
 	//Create payment_data array
 	$payment_data = array(
 		'price'           => $purchase_data['price'],
@@ -47,7 +47,7 @@ function give_manual_payment( $purchase_data ) {
 		'date'            => $purchase_data['date'],
 		'user_email'      => $purchase_data['user_email'],
 		'purchase_key'    => $purchase_data['purchase_key'],
-		'currency'        => give_get_currency(),
+		'currency'        => give_get_currency( $purchase_data['post_data']['give-form-id'], $purchase_data ),
 		'user_info'       => $purchase_data['user_info'],
 		'status'          => 'pending'
 	);

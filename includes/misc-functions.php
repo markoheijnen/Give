@@ -33,13 +33,34 @@ function give_is_test_mode() {
  * Get the set currency
  *
  * @since 1.0
+ * @since 1.8.15 Upgrade function to handle dynamic currency
+ *
+ * @param int          $donation_or_form_id Donation or Form ID
+ * @param array|object $args                Additional data
+ *
  * @return string The currency code
  */
-function give_get_currency() {
+function give_get_currency( $donation_or_form_id = null, $args = array() ) {
 
-	$currency = give_get_option( 'currency', 'USD' );
+	// Get currency from donation
+	if ( is_numeric( $donation_or_form_id ) && 'give_payment' === get_post_type( $donation_or_form_id ) ) {
+		$donation_meta = give_get_meta( $donation_or_form_id, '_give_payment_meta', true );
 
-	return apply_filters( 'give_currency', $currency );
+		if ( ! empty( $donation_meta['currency'] ) ) {
+			$currency = $donation_meta['currency'];
+		} else {
+			$currency = give_get_option( 'currency', 'USD' );
+		}
+	} else {
+		$currency = give_get_option( 'currency', 'USD' );
+	}
+
+	/**
+	 * Filter the currency on basis of donation or form id or addtional data.
+	 *
+	 * @since 1.0
+	 */
+	return apply_filters( 'give_currency', $currency, $donation_or_form_id, $args );
 }
 
 /**
@@ -61,44 +82,378 @@ function give_get_currency_position() {
  * Get Currencies
  *
  * @since 1.0
+ *
+ * @param string $info Specify currency info
+ *
  * @return array $currencies A list of the available currencies
  */
-
-function give_get_currencies() {
+function give_get_currencies( $info = 'admin_label' ) {
 	$currencies = array(
-		'USD'  => __( 'US Dollars ($)', 'give' ),
-		'EUR'  => __( 'Euros (€)', 'give' ),
-		'GBP'  => __( 'Pounds Sterling (£)', 'give' ),
-		'AUD'  => __( 'Australian Dollars ($)', 'give' ),
-		'BRL'  => __( 'Brazilian Real (R$)', 'give' ),
-		'CAD'  => __( 'Canadian Dollars ($)', 'give' ),
-		'CZK'  => __( 'Czech Koruna (Kč)', 'give' ),
-		'DKK'  => __( 'Danish Krone (kr.)', 'give' ),
-		'HKD'  => __( 'Hong Kong Dollar ($)', 'give' ),
-		'HUF'  => __( 'Hungarian Forint (Ft)', 'give' ),
-		'ILS'  => __( 'Israeli Shekel (₪)', 'give' ),
-		'JPY'  => __( 'Japanese Yen (¥)', 'give' ),
-		'MYR'  => __( 'Malaysian Ringgits (RM)', 'give' ),
-		'MXN'  => __( 'Mexican Peso ($)', 'give' ),
-		'MAD'  => __( 'Moroccan Dirham (&#x2e;&#x62f;&#x2e;&#x645;)', 'give' ),
-		'NZD'  => __( 'New Zealand Dollar ($)', 'give' ),
-		'NOK'  => __( 'Norwegian Krone (Kr.)', 'give' ),
-		'PHP'  => __( 'Philippine Pesos (₱)', 'give' ),
-		'PLN'  => __( 'Polish Zloty (zł)', 'give' ),
-		'SGD'  => __( 'Singapore Dollar ($)', 'give' ),
-		'KRW'  => __( 'South Korean Won (₩)', 'give' ),
-		'ZAR'  => __( 'South African Rand (R)', 'give' ),
-		'SEK'  => __( 'Swedish Krona (kr)', 'give' ),
-		'CHF'  => __( 'Swiss Franc (CHF)', 'give' ),
-		'TWD'  => __( 'Taiwan New Dollars (NT$)', 'give' ),
-		'THB'  => __( 'Thai Baht (฿)', 'give' ),
-		'INR'  => __( 'Indian Rupee (₹)', 'give' ),
-		'TRY'  => __( 'Turkish Lira (₺)', 'give' ),
-		'RIAL' => __( 'Iranian Rial (﷼)', 'give' ),
-		'RUB'  => __( 'Russian Rubles (руб)', 'give' ),
+		'USD'  => array(
+			'admin_label' => __( 'US Dollars ($)', 'give' ),
+			'symbol'      => '&#36;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'EUR'  => array(
+			'admin_label' => __( 'Euros (€)', 'give' ),
+			'symbol'      => '&euro;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => '.',
+				'decimal_separator'   => ',',
+				'number_decimals'     => 2,
+			),
+		),
+		'GBP'  => array(
+			'admin_label' => __( 'Pounds Sterling (£)', 'give' ),
+			'symbol'      => '&pound;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'AUD'  => array(
+			'admin_label' => __( 'Australian Dollars ($)', 'give' ),
+			'symbol'      => '&#36;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'BRL'  => array(
+			'admin_label' => __( 'Brazilian Real (R$)', 'give' ),
+			'symbol'      => '&#82;&#36;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'CAD'  => array(
+			'admin_label' => __( 'Canadian Dollars ($)', 'give' ),
+			'symbol'      => '&#36;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'CZK'  => array(
+			'admin_label' => __( 'Czech Koruna (Kč)', 'give' ),
+			'symbol'      => '&#75;&#269;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'DKK'  => array(
+			'admin_label' => __( 'Danish Krone (kr.)', 'give' ),
+			'symbol'      => '&nbsp;kr.&nbsp;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'HKD'  => array(
+			'admin_label' => __( 'Hong Kong Dollar ($)', 'give' ),
+			'symbol'      => '&#36;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'HUF'  => array(
+			'admin_label' => __( 'Hungarian Forint (Ft)', 'give' ),
+			'symbol'      => '&#70;&#116;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'ILS'  => array(
+			'admin_label' => __( 'Israeli Shekel (₪)', 'give' ),
+			'symbol'      => '&#8362;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'JPY'  => array(
+			'admin_label' => __( 'Japanese Yen (¥)', 'give' ),
+			'symbol'      => '&yen;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 0,
+			),
+		),
+		'MYR'  => array(
+			'admin_label' => __( 'Malaysian Ringgits (RM)', 'give' ),
+			'symbol'      => '&#82;&#77;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'MXN'  => array(
+			'admin_label' => __( 'Mexican Peso ($)', 'give' ),
+			'symbol'      => '&#36;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'MAD'  => array(
+			'admin_label' => __( 'Moroccan Dirham (&#x2e;&#x62f;&#x2e;&#x645;)', 'give' ),
+			'symbol'      => '&#x2e;&#x62f;&#x2e;&#x645;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'NZD'  => array(
+			'admin_label' => __( 'New Zealand Dollar ($)', 'give' ),
+			'symbol'      => '&#36;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'NOK'  => array(
+			'admin_label' => __( 'Norwegian Krone (Kr.)', 'give' ),
+			'symbol'      => '&#107;&#114;.',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => '.',
+				'decimal_separator'   => ',',
+				'number_decimals'     => 2,
+			),
+		),
+		'PHP'  => array(
+			'admin_label' => __( 'Philippine Pesos (₱)', 'give' ),
+			'symbol'      => '&#8369;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'PLN'  => array(
+			'admin_label' => __( 'Polish Zloty (zł)', 'give' ),
+			'symbol'      => '&#122;&#322;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ' ',
+				'decimal_separator'   => ',',
+				'number_decimals'     => 2,
+			),
+		),
+		'SGD'  => array(
+			'admin_label' => __( 'Singapore Dollar ($)', 'give' ),
+			'symbol'      => '&#36;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'KRW'  => array(
+			'admin_label' => __( 'South Korean Won (₩)', 'give' ),
+			'symbol'      => '&#8361;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 0,
+			),
+		),
+		'ZAR'  => array(
+			'admin_label' => __( 'South African Rand (R)', 'give' ),
+			'symbol'      => '&#82;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ' ',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'SEK'  => array(
+			'admin_label' => __( 'Swedish Krona (kr)', 'give' ),
+			'symbol'      => '&nbsp;kr.&nbsp;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ' ',
+				'decimal_separator'   => ',',
+				'number_decimals'     => 2,
+			),
+		),
+		'CHF'  => array(
+			'admin_label' => __( 'Swiss Franc (CHF)', 'give' ),
+			'symbol'      => 'CHF',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'TWD'  => array(
+			'admin_label' => __( 'Taiwan New Dollars (NT$)', 'give' ),
+			'symbol'      => '&#78;&#84;&#36;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => '\'',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'THB'  => array(
+			'admin_label' => __( 'Thai Baht (฿)', 'give' ),
+			'symbol'      => '&#3647;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'INR'  => array(
+			'admin_label' => __( 'Indian Rupee (₹)', 'give' ),
+			'symbol'      => '&#8377;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'TRY'  => array(
+			'admin_label' => __( 'Turkish Lira (₺)', 'give' ),
+			'symbol'      => '&#8378;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'RIAL' => array(
+			'admin_label' => __( 'Iranian Rial (﷼)', 'give' ),
+			'symbol'      => '&#xfdfc;',
+			'setting'     => array(
+				'currency_position'   => 'after',
+				'thousands_separator' => ',',
+				'decimal_separator'   => '.',
+				'number_decimals'     => 2,
+			),
+		),
+		'RUB'  => array(
+			'admin_label' => __( 'Russian Rubles (руб)', 'give' ),
+			'symbol'      => '&#8381;',
+			'setting'     => array(
+				'currency_position'   => 'before',
+				'thousands_separator' => '.',
+				'decimal_separator'   => ',',
+				'number_decimals'     => 2,
+			),
+		),
 	);
 
-	return apply_filters( 'give_currencies', $currencies );
+
+	/**
+	 * Filter the currencies
+	 * Note: you can register new currency by using this filter
+	 * array(
+	 *     'admin_label' => '',  // required
+	 *     'symbol'      => '',  // required
+	 *     'setting'     => ''   // required
+	 *     ....
+	 * )
+	 *
+	 * @since 1.8.15
+	 *
+	 * @param array $currencies
+	 */
+	$currencies = apply_filters( 'give_currencies', $currencies );
+
+	// Backward compatibility: handle old way of currency registration.
+	// Backward compatibility: Return desired result.
+	if ( ! empty( $currencies ) ) {
+		foreach ( $currencies as $currency_code => $currency_setting ) {
+			if ( is_string( $currency_setting ) ) {
+				$currencies[ $currency_code ] = array(
+					'admin_label' => $currency_setting,
+					'symbol'      => '',
+					'setting'     => array(),
+				);
+			}
+		}
+
+		if ( ! empty( $info ) && is_string( $info ) && 'all' !== $info ) {
+			$currencies = wp_list_pluck( $currencies, $info );
+		}
+	}
+
+	return $currencies;
+}
+
+
+/**
+ * Get all currency symbols
+ *
+ * @since 1.8.14
+ *
+ * @param bool $decode_currencies
+ *
+ * @return array
+ */
+function give_currency_symbols( $decode_currencies = false ) {
+	$currencies = give_get_currencies('symbol' );
+
+	if ( $decode_currencies ) {
+		$currencies = array_map( 'html_entity_decode', $currencies );
+	}
+
+	/**
+	 * Filter the currency symbols
+	 *
+	 * @since 1.8.14
+	 *
+	 * @param array $currencies
+	 */
+	return apply_filters( 'give_currency_symbols', $currencies );
 }
 
 
@@ -120,86 +475,18 @@ function give_currency_symbol( $currency = '', $decode_currency = false ) {
 	if ( empty( $currency ) ) {
 		$currency = give_get_currency();
 	}
-	switch ( $currency ) :
-		case 'GBP' :
-			$symbol = '&pound;';
-			break;
-		case 'BRL' :
-			$symbol = '&#82;&#36;';
-			break;
-		case 'EUR' :
-			$symbol = '&euro;';
-			break;
-		case 'NOK' :
-			$symbol = '&#107;&#114;.';
-			break;
-		case 'INR' :
-			$symbol = '&#8377;';
-			break;
-		case 'USD' :
-		case 'AUD' :
-		case 'CAD' :
-		case 'HKD' :
-		case 'MXN' :
-		case 'SGD' :
-			$symbol = '&#36;';
-			break;
-		case 'JPY' :
-			$symbol = '&yen;';
-			break;
-		case 'THB' :
-			$symbol = '&#3647;';
-			break;
-		case 'TRY' :
-			$symbol = '&#8378;';
-			break;
-		case 'TWD' :
-			$symbol = '&#78;&#84;&#36;';
-			break;
-		case 'ILS' :
-			$symbol = '&#8362;';
-			break;
-		case 'RIAL' :
-			$symbol = '&#xfdfc;';
-			break;
-		case 'RUB' :
-			$symbol = '&#8381;';
-			break;
-		case 'DKK' :
-		case 'SEK' :
-			$symbol = '&nbsp;kr.&nbsp;';
-			break;
-		case 'PLN' :
-			$symbol = '&#122;&#322;';
-			break;
-		case 'PHP' :
-			$symbol = '&#8369;';
-			break;
-		case 'MYR' :
-			$symbol = '&#82;&#77;';
-			break;
-		case 'HUF' :
-			$symbol = '&#70;&#116;';
-			break;
-		case 'CZK' :
-			$symbol = '&#75;&#269;';
-			break;
-		case 'KRW' :
-			$symbol = '&#8361;';
-			break;
-		case 'ZAR' :
-			$symbol = '&#82;';
-			break;
-		case 'MAD' :
-			$symbol = '&#x2e;&#x62f;&#x2e;&#x645;';
-			break;
-		default :
-			$symbol = $currency;
-			break;
-	endswitch;
 
-	$symbol = ( ! $decode_currency ? $symbol : html_entity_decode( $symbol ) );
+	$currencies = give_currency_symbols( $decode_currency );
+	$symbol     = array_key_exists( $currency, $currencies ) ? $currencies[ $currency ] : $currency;
 
+	/**
+	 * Filter the currency symbol
+	 *
+	 * @since 1.0
+	 *
+	 * @param string $symbol
+	 * @param string $currency
+	 */
 	return apply_filters( 'give_currency_symbol', $symbol, $currency );
 }
 
@@ -222,6 +509,14 @@ function give_get_currency_name( $currency_code ) {
 		$currency_name = trim( current( $currency_name ) );
 	}
 
+	/**
+	 * Filter the currency name
+	 *
+	 * @since 1.8.8
+	 *
+	 * @param string $currency_name
+	 * @param string $currency_code
+	 */
 	return apply_filters( 'give_currency_name', $currency_name, $currency_code );
 }
 
@@ -250,6 +545,13 @@ function give_get_current_page_url() {
 		$current_uri = home_url( '/' );
 	}
 
+	/**
+	 * Filter the current page url
+	 *
+	 * @since 1.0
+	 *
+	 * @param string $current_uri
+	 */
 	return apply_filters( 'give_get_current_page_url', $current_uri );
 
 }
@@ -280,7 +582,14 @@ function give_is_cc_verify_enabled() {
 		$ret = false;
 	}
 
-	return (bool) apply_filters( 'give_verify_credit_cards', $ret );
+	/**
+	 * Fire the filter
+	 *
+	 * @since 1.0
+	 *
+	 * @param bool $ret
+	 */
+	return (bool) apply_filters( 'give_is_cc_verify_enabled', $ret );
 }
 
 /**
@@ -380,6 +689,58 @@ function give_get_purchase_session() {
 }
 
 /**
+ * Generate Item Title for Payment Gateway.
+ *
+ * @param array $payment_data Payment Data.
+ *
+ * @since 1.8.14
+ *
+ * @return string
+ */
+function give_payment_gateway_item_title( $payment_data ) {
+	$form_id          = intval( $payment_data['post_data']['give-form-id'] );
+	$item_name        = $payment_data['post_data']['give-form-title'];
+	$is_custom_amount = give_is_setting_enabled( give_get_meta( $form_id, '_give_custom_amount', true ) );
+
+	// Verify has variable prices.
+	if ( give_has_variable_prices( $form_id ) && isset( $payment_data['post_data']['give-price-id'] ) ) {
+
+		$item_price_level_text = give_get_price_option_name( $form_id, $payment_data['post_data']['give-price-id'] );
+		$price_level_amount    = give_get_price_option_amount( $form_id, $payment_data['post_data']['give-price-id'] );
+
+		// Donation given doesn't match selected level (must be a custom amount).
+		if ( $price_level_amount !== give_maybe_sanitize_amount( $payment_data['post_data']['give-amount'] ) ) {
+			$custom_amount_text = give_get_meta( $form_id, '_give_custom_amount_text', true );
+
+			// user custom amount text if any, fallback to default if not.
+			$item_name .= ' - ' . give_check_variable( $custom_amount_text, 'empty', __( 'Custom Amount', 'give' ) );
+
+		} elseif ( ! empty( $item_price_level_text ) ) {
+			// Matches a donation level - append level text.
+			$item_name .= ' - ' . $item_price_level_text;
+		}
+	} // End if().
+	elseif ( $is_custom_amount && give_get_form_price( $form_id ) !== give_maybe_sanitize_amount( $payment_data['post_data']['give-amount'] ) ) {
+		$custom_amount_text = give_get_meta( $form_id, '_give_custom_amount_text', true );
+		// user custom amount text if any, fallback to default if not.
+		$item_name .= ' - ' . give_check_variable( $custom_amount_text, 'empty', __( 'Custom Amount', 'give' ) );
+	}
+
+	/**
+	 * Filter the Item Title of Payment Gateway.
+	 *
+	 * @param string $item_name    Item Title of Payment Gateway.
+	 * @param int    $form_id      Donation Form ID.
+	 * @param array  $payment_data Payment Data.
+	 *
+	 * @since 1.8.14
+	 *
+	 * @return string
+	 */
+	return apply_filters( 'give_payment_gateway_item_title', $item_name, $form_id, $payment_data );
+}
+
+/**
  * Get Donation Summary
  *
  * Creates a donation summary for payment gateways from the donation data before the payment is created in the database.
@@ -393,15 +754,11 @@ function give_get_purchase_session() {
  * @return string
  */
 function give_payment_gateway_donation_summary( $donation_data, $name_and_email = true, $length = 255 ) {
-
-	$summary = '';
-
 	$form_id = isset( $donation_data['post_data']['give-form-id'] ) ? $donation_data['post_data']['give-form-id'] : '';
 
 	// Form title.
-	if ( isset( $donation_data['post_data']['give-form-title'] ) ) {
-		$summary .= $donation_data['post_data']['give-form-title'];
-	}
+	$summary = ( ! empty( $donation_data['post_data']['give-form-title'] ) ? $donation_data['post_data']['give-form-title'] : ( ! empty( $form_id ) ? wp_sprintf( __( 'Donation Form ID: %d', 'give' ), $form_id ) : __( 'Untitled donation form', 'give' ) ) );
+
 	// Form multilevel if applicable.
 	if ( isset( $donation_data['post_data']['give-price-id'] ) ) {
 		$summary .= ': ' . give_get_price_option_name( $form_id, $donation_data['post_data']['give-price-id'] );
@@ -664,7 +1021,6 @@ function give_is_func_disabled( $function ) {
 	return in_array( $function, $disabled );
 }
 
-
 /**
  * Give Newsletter
  *
@@ -678,8 +1034,8 @@ function give_get_newsletter() {
 	<div class="give-newsletter-form-wrap">
 
 		<form action="//givewp.us3.list-manage.com/subscribe/post?u=3ccb75d68bda4381e2f45794c&amp;id=12a081aa13"
-		      method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate"
-		      target="_blank" novalidate>
+			  method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate"
+			  target="_blank" novalidate>
 			<div class="give-newsletter-confirmation">
 				<p><?php esc_html_e( 'Thanks for Subscribing!', 'give' ); ?> :)</p>
 			</div>
@@ -688,26 +1044,26 @@ function give_get_newsletter() {
 				<tr valign="middle">
 					<td>
 						<label for="mce-EMAIL"
-						       class="screen-reader-text"><?php esc_html_e( 'Email Address (required)', 'give' ); ?></label>
+							   class="screen-reader-text"><?php esc_html_e( 'Email Address (required)', 'give' ); ?></label>
 						<input type="email" name="EMAIL" id="mce-EMAIL"
-						       placeholder="<?php esc_attr_e( 'Email Address (required)', 'give' ); ?>"
-						       class="required email" value="">
+							   placeholder="<?php esc_attr_e( 'Email Address (required)', 'give' ); ?>"
+							   class="required email" value="">
 					</td>
 					<td>
 						<label for="mce-FNAME"
-						       class="screen-reader-text"><?php esc_html_e( 'First Name', 'give' ); ?></label>
+							   class="screen-reader-text"><?php esc_html_e( 'First Name', 'give' ); ?></label>
 						<input type="text" name="FNAME" id="mce-FNAME"
-						       placeholder="<?php esc_attr_e( 'First Name', 'give' ); ?>" class="" value="">
+							   placeholder="<?php esc_attr_e( 'First Name', 'give' ); ?>" class="" value="">
 					</td>
 					<td>
 						<label for="mce-LNAME"
-						       class="screen-reader-text"><?php esc_html_e( 'Last Name', 'give' ); ?></label>
+							   class="screen-reader-text"><?php esc_html_e( 'Last Name', 'give' ); ?></label>
 						<input type="text" name="LNAME" id="mce-LNAME"
-						       placeholder="<?php esc_attr_e( 'Last Name', 'give' ); ?>" class="" value="">
+							   placeholder="<?php esc_attr_e( 'Last Name', 'give' ); ?>" class="" value="">
 					</td>
 					<td>
 						<input type="submit" name="subscribe" id="mc-embedded-subscribe" class="button"
-						       value="<?php esc_attr_e( 'Subscribe', 'give' ); ?>">
+							   value="<?php esc_attr_e( 'Subscribe', 'give' ); ?>">
 					</td>
 				</tr>
 			</table>
@@ -720,36 +1076,37 @@ function give_get_newsletter() {
 	</div>
 
 	<script type='text/javascript' src='//s3.amazonaws.com/downloads.mailchimp.com/js/mc-validate.js'></script>
-	<script type='text/javascript'>(function( $ ) {
-				window.fnames = new Array();
-				window.ftypes = new Array();
-				fnames[ 0 ] = 'EMAIL';
-				ftypes[ 0 ] = 'email';
-				fnames[ 1 ] = 'FNAME';
-				ftypes[ 1 ] = 'text';
-				fnames[ 2 ] = 'LNAME';
-				ftypes[ 2 ] = 'text';
+	<script type='text/javascript'>(function ($) {
+			window.fnames = new Array();
+			window.ftypes = new Array();
+			fnames[0]     = 'EMAIL';
+			ftypes[0]     = 'email';
+			fnames[1]     = 'FNAME';
+			ftypes[1]     = 'text';
+			fnames[2]     = 'LNAME';
+			ftypes[2]     = 'text';
 
-				//Successful submission
-				$( 'form[name="mc-embedded-subscribe-form"]' ).on( 'submit', function() {
+			//Successful submission
+			$('form[name="mc-embedded-subscribe-form"]').on('submit', function () {
 
-					var email_field = $( this ).find( '#mce-EMAIL' ).val();
-					if ( ! email_field ) {
-						return false;
-					}
-					$( this ).find( '.give-newsletter-confirmation' ).show().delay( 5000 ).slideUp();
-					$( this ).find( '.give-newsletter-form' ).hide();
+				var email_field = $(this).find('#mce-EMAIL').val();
+				if (!email_field) {
+					return false;
+				}
+				$(this).find('.give-newsletter-confirmation').show().delay(5000).slideUp();
+				$(this).find('.give-newsletter-form').hide();
 
-				} );
+			});
 
-			}( jQuery ));
-			var $mcj = jQuery.noConflict( true );
+		}(jQuery));
+		var $mcj = jQuery.noConflict(true);
 
 
 	</script>
 	<!--End mc_embed_signup-->
 
-<?php }
+<?php
+}
 
 
 /**
@@ -794,30 +1151,51 @@ function modify_nav_menu_meta_box_object( $post_type ) {
 add_filter( 'nav_menu_meta_box_object', 'modify_nav_menu_meta_box_object' );
 
 /**
- * Enable 'Donation Form' meta enabled by default on Menu page.
+ * Show Donation Forms Post Type in Appearance > Menus by default on fresh install.
  *
- * @since 1.8.9
+ * @since 1.8.14
+ *
+ * @todo  Remove this, when WordPress Core ticket is resolved (https://core.trac.wordpress.org/ticket/16828).
+ *
+ * @return bool
  */
-function give_nav_donation_metabox_enabled() {
+function give_donation_metabox_menu() {
 
-	// Return false, if it fails to retrieve hidden meta box list and is not admin.
-	if ( ( ! $hidden_meta_boxes = get_user_option( 'metaboxhidden_nav-menus' ) ) || ! is_admin() ) {
-		return false;
+	// Get Current Screen.
+	$screen = get_current_screen();
+
+	// Proceed, if current screen is navigation menus.
+	if (
+		'nav-menus' === $screen->id &&
+		give_is_setting_enabled( give_get_option( 'forms_singular' ) ) &&
+		! get_user_option( 'give_is_donation_forms_menu_updated' )
+	) {
+
+		// Return false, if it fails to retrieve hidden meta box list and is not admin.
+		if (
+			! is_admin() ||
+			( ! $hidden_meta_boxes = get_user_option( 'metaboxhidden_nav-menus' ) )
+		) {
+			return false;
+		}
+
+		// Return false, In case, we don't find 'Donation Form' in hidden meta box list.
+		if ( ! in_array( 'add-post-type-give_forms', $hidden_meta_boxes, true ) ) {
+			return false;
+		}
+
+		// Exclude 'Donation Form' value from hidden meta box's list.
+		$hidden_meta_boxes = array_diff( $hidden_meta_boxes, array( 'add-post-type-give_forms' ) );
+
+		// Get current user ID.
+		$user = wp_get_current_user();
+
+		update_user_option( $user->ID, 'metaboxhidden_nav-menus', $hidden_meta_boxes, true );
+		update_user_option( $user->ID, 'give_is_donation_forms_menu_updated', true, true );
 	}
-
-	// Return false, In case, we don't find 'Donation Form' in hidden meta box list.
-	if ( ! in_array( 'add-post-type-give_forms', $hidden_meta_boxes, true ) ) {
-		return false;
-	}
-
-	// Exclude 'Donation Form' value from hidden meta box's list.
-	$hidden_meta_boxes = array_diff( $hidden_meta_boxes, array( 'add-post-type-give_forms' ) );
-
-	// Get current user ID.
-	$user = wp_get_current_user();
-
-	update_user_option( $user->ID, 'metaboxhidden_nav-menus', $hidden_meta_boxes, true );
 }
+
+add_action( 'current_screen', 'give_donation_metabox_menu' );
 
 /**
  * Array_column backup usage
@@ -869,10 +1247,10 @@ if ( ! function_exists( 'array_column' ) ) {
 		}
 
 		if ( ! is_int( $params[1] )
-		     && ! is_float( $params[1] )
-		     && ! is_string( $params[1] )
-		     && $params[1] !== null
-		     && ! ( is_object( $params[1] ) && method_exists( $params[1], '__toString' ) )
+			 && ! is_float( $params[1] )
+			 && ! is_string( $params[1] )
+			 && $params[1] !== null
+			 && ! ( is_object( $params[1] ) && method_exists( $params[1], '__toString' ) )
 		) {
 			trigger_error( esc_html__( 'array_column(): The column key should be either a string or an integer.', 'give' ), E_USER_WARNING );
 
@@ -880,10 +1258,10 @@ if ( ! function_exists( 'array_column' ) ) {
 		}
 
 		if ( isset( $params[2] )
-		     && ! is_int( $params[2] )
-		     && ! is_float( $params[2] )
-		     && ! is_string( $params[2] )
-		     && ! ( is_object( $params[2] ) && method_exists( $params[2], '__toString' ) )
+			 && ! is_int( $params[2] )
+			 && ! is_float( $params[2] )
+			 && ! is_string( $params[2] )
+			 && ! ( is_object( $params[2] ) && method_exists( $params[2], '__toString' ) )
 		) {
 			trigger_error( esc_html__( 'array_column(): The index key should be either a string or an integer.', 'give' ), E_USER_WARNING );
 
@@ -1161,8 +1539,8 @@ function give_get_meta( $id, $meta_key, $single = false, $default = false ) {
  *
  * @param int    $id
  * @param string $meta_key
- * @param string $meta_value
- * @param string $prev_value
+ * @param mixed  $meta_value
+ * @param mixed  $prev_value
  *
  * @return mixed
  */
@@ -1274,8 +1652,327 @@ function give_set_upgrade_complete( $upgrade_action = '' ) {
  * @return array The array of completed upgrades
  */
 function give_get_completed_upgrades() {
-
 	return (array) get_option( 'give_completed_upgrades' );
-
 }
 
+/**
+ * Remove the Give transaction pages from WP search results.
+ *
+ * @since 1.8.13
+ *
+ * @param \WP_Query
+ */
+function give_remove_pages_from_search( $query ) {
+	if ( ! $query->is_admin && $query->is_search && $query->is_main_query() ) {
+		$transaction_failed = give_get_option( 'failure_page', 0 );
+		$success_page       = give_get_option( 'success_page', 0 );
+		$args               = apply_filters(
+			'give_remove_pages_from_search', array(
+				$transaction_failed,
+				$success_page,
+			), $query
+		);
+		$query->set( 'post__not_in', $args );
+	}
+}
+
+add_action( 'pre_get_posts', 'give_remove_pages_from_search', 10, 1 );
+
+/**
+ * Inserts a new key/value before a key in the array.
+ *
+ * @since 1.8.13
+ *
+ * @param string       $key       The key to insert before.
+ * @param array        $array     An array to insert in to.
+ * @param string       $new_key   The key to insert.
+ * @param array|string $new_value An value to insert.
+ *
+ * @return array The new array if the key exists, the passed array otherwise.
+ *
+ * @see   array_insert_before()
+ */
+function give_array_insert_before( $key, array &$array, $new_key, $new_value ) {
+	if ( array_key_exists( $key, $array ) ) {
+		$new = array();
+		foreach ( $array as $k => $value ) {
+			if ( $k === $key ) {
+				$new[ $new_key ] = $new_value;
+			}
+			$new[ $k ] = $value;
+		}
+
+		return $new;
+	}
+
+	return $array;
+}
+
+/**
+ * Inserts a new key/value after a key in the array.
+ *
+ * @since 1.8.13
+ *
+ * @param string       $key       The key to insert after.
+ * @param array        $array     An array to insert in to.
+ * @param string       $new_key   The key to insert.
+ * @param array|string $new_value An value to insert.
+ *
+ * @return array The new array if the key exists, the passed array otherwise.
+ *
+ * @see   array_insert_before()
+ */
+function give_array_insert_after( $key, array &$array, $new_key, $new_value ) {
+	if ( array_key_exists( $key, $array ) ) {
+		$new = array();
+		foreach ( $array as $k => $value ) {
+			$new[ $k ] = $value;
+			if ( $k === $key ) {
+				$new[ $new_key ] = $new_value;
+			}
+		}
+
+		return $new;
+	}
+
+	return $array;
+}
+
+/**
+ * Pluck a certain field out of each object in a list.
+ *
+ * This has the same functionality and prototype of
+ * array_column() (PHP 5.5) but also supports objects.
+ *
+ * @since 1.8.13
+ *
+ * @param array      $list      List of objects or arrays
+ * @param int|string $field     Field from the object to place instead of the entire object
+ * @param int|string $index_key Optional. Field from the object to use as keys for the new array.
+ *                              Default null.
+ *
+ * @return array Array of found values. If `$index_key` is set, an array of found values with keys
+ *               corresponding to `$index_key`. If `$index_key` is null, array keys from the original
+ *               `$list` will be preserved in the results.
+ */
+function give_list_pluck( $list, $field, $index_key = null ) {
+
+	if ( ! $index_key ) {
+		/*
+		 * This is simple. Could at some point wrap array_column()
+		 * if we knew we had an array of arrays.
+		 */
+		foreach ( $list as $key => $value ) {
+			if ( is_object( $value ) ) {
+				if ( isset( $value->$field ) ) {
+					$list[ $key ] = $value->$field;
+				}
+			} else {
+				if ( isset( $value[ $field ] ) ) {
+					$list[ $key ] = $value[ $field ];
+				}
+			}
+		}
+
+		return $list;
+	}
+
+	/*
+	 * When index_key is not set for a particular item, push the value
+	 * to the end of the stack. This is how array_column() behaves.
+	 */
+	$newlist = array();
+	foreach ( $list as $value ) {
+		if ( is_object( $value ) ) {
+			if ( isset( $value->$index_key ) ) {
+				$newlist[ $value->$index_key ] = $value->$field;
+			} else {
+				$newlist[] = $value->$field;
+			}
+		} else {
+			if ( isset( $value[ $index_key ] ) ) {
+				$newlist[ $value[ $index_key ] ] = $value[ $field ];
+			} else {
+				$newlist[] = $value[ $field ];
+			}
+		}
+	}
+
+	$list = $newlist;
+
+	return $list;
+}
+
+/**
+ * Add meta data field to a donor.
+ *
+ * @since 1.8.13
+ *
+ * @param int    $donor_id   Donor ID.
+ * @param string $meta_key   Metadata name.
+ * @param mixed  $meta_value Metadata value. Must be serializable if non-scalar.
+ * @param bool   $unique     Optional. Whether the same key should not be added.
+ *                           Default false.
+ *
+ * @return int|false Meta ID on success, false on failure.
+ */
+function add_donor_meta( $donor_id, $meta_key, $meta_value, $unique = false ) {
+	return add_metadata( 'give_customer', $donor_id, $meta_key, $meta_value, $unique );
+}
+
+/**
+ * Remove metadata matching criteria from a Donor meta.
+ *
+ * You can match based on the key, or key and value. Removing based on key and
+ * value, will keep from removing duplicate metadata with the same key. It also
+ * allows removing all metadata matching key, if needed.
+ *
+ * @since 1.8.13
+ *
+ * @param int    $donor_id   Donor ID
+ * @param string $meta_key   Metadata name.
+ * @param mixed  $meta_value Optional. Metadata value.
+ *
+ * @return bool True on success, false on failure.
+ */
+function delete_donor_meta( $donor_id, $meta_key, $meta_value = '' ) {
+	return delete_metadata( 'give_customer', $donor_id, $meta_key, $meta_value );
+}
+
+/**
+ * Retrieve donor meta field for a donor meta table.
+ *
+ * @since 1.8.13
+ *
+ * @param int    $donor_id Donor ID.
+ * @param string $key      Optional. The meta key to retrieve. By default, returns data for all keys.
+ * @param bool   $single   Whether to return a single value.
+ *
+ * @return mixed Will be an array if $single is false. Will be value of meta data field if $single
+ *  is true.
+ */
+function get_donor_meta( $donor_id, $key = '', $single = false ) {
+	return get_metadata( 'give_customer', $donor_id, $key, $single );
+}
+
+/**
+ * Update customer meta field based on Donor ID.
+ *
+ * If the meta field for the donor does not exist, it will be added.
+ *
+ * @since 1.8.13
+ *
+ * @param int    $donor_id   Donor ID.
+ * @param string $meta_key   Metadata key.
+ * @param mixed  $meta_value Metadata value.
+ * @param mixed  $prev_value Optional. Previous value to check before removing.
+ *
+ * @return int|bool Meta ID if the key didn't exist, true on successful update, false on failure.
+ */
+function update_donor_meta( $donor_id, $meta_key, $meta_value, $prev_value = '' ) {
+	return update_metadata( 'give_customer', $donor_id, $meta_key, $meta_value, $prev_value );
+}
+
+/*
+ * Give recalculate income and donation of the donation from ID
+ *
+ * @since 1.8.13
+ *
+ * @param int $form_id Form id of which recalculation needs to be done.
+ */
+function give_recount_form_income_donation( $form_id = false ) {
+	// Check if form id is not empty.
+	if ( ! empty( $form_id ) ) {
+		/**
+		 * Filter to modify payment status.
+		 *
+		 * @since 1.8.13
+		 */
+		$accepted_statuses = apply_filters( 'give_recount_accepted_statuses', array( 'publish' ) );
+
+		/**
+		 * Filter to modify args of payment query before recalculating the form total
+		 *
+		 * @since 1.8.13
+		 */
+		$args = apply_filters(
+			'give_recount_form_stats_args', array(
+				'give_forms'     => $form_id,
+				'status'         => $accepted_statuses,
+				'posts_per_page' => - 1,
+				'fields'         => 'ids',
+			)
+		);
+
+		$totals = array(
+			'sales'    => 0,
+			'earnings' => 0,
+		);
+
+		$payments = new Give_Payments_Query( $args );
+		$payments = $payments->get_payments();
+
+		if ( $payments ) {
+			foreach ( $payments as $payment ) {
+				// Ensure acceptible status only
+				if ( ! in_array( $payment->post_status, $accepted_statuses ) ) {
+					continue;
+				}
+
+				// Ensure only payments for this form are counted
+				if ( $payment->form_id != $form_id ) {
+					continue;
+				}
+
+				$totals['sales'] ++;
+				$totals['earnings'] += $payment->total;
+
+			}
+		}
+		give_update_meta( $form_id, '_give_form_sales', $totals['sales'] );
+		give_update_meta( $form_id, '_give_form_earnings', give_sanitize_amount_for_db( $totals['earnings'] ) );
+	}// End if().
+}
+
+/**
+ * Zero Decimal based Currency.
+ *
+ * @since 1.8.14
+ * @see   https://github.com/WordImpress/Give/issues/2191
+ *
+ *
+ * @param string $currency Currency code
+ *
+ * @return bool
+ */
+function give_is_zero_based_currency( $currency = '' ) {
+	$zero_based_currency = array(
+		'PYG', // Paraguayan Guarani.
+		'GNF', // Guinean Franc.
+		'RWF', // Rwandan Franc.
+		'JPY', // Japanese Yen.
+		'BIF', // Burundian Franc.
+		'KRW', // South Korean Won.
+		'MGA', // Malagasy Ariary.
+		'XAF', // Central African Cfa Franc.
+		'XPF', // Cfp Franc.
+		'CLP', // Chilean Peso.
+		'KMF', // Comorian Franc.
+		'DJF', // Djiboutian Franc.
+		'VUV', // Vanuatu Vatu.
+		'VND', // Vietnamese Dong.
+		'XOF', // West African Cfa Franc.
+	);
+
+	// Set default currency.
+	if( empty( $currency ) ) {
+		$currency = give_get_currency();
+	}
+
+	// Check for Zero Based Currency.
+	if ( in_array( $currency, $zero_based_currency ) ) {
+		return true;
+	}
+
+	return false;
+}
