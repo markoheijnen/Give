@@ -109,7 +109,7 @@ class Give_HTML_Elements {
 			'selected'    => 0,
 			'chosen'      => false,
 			'number'      => 30,
-			'placeholder' => esc_attr__( 'Select a Donation Form', 'give' ),
+			'placeholder' => esc_attr__( 'All Forms', 'give' ),
 			'data'        => array(
 				'search-type' => 'form',
 			),
@@ -161,7 +161,7 @@ class Give_HTML_Elements {
 	/**
 	 * Donors Dropdown
 	 *
-	 * Renders an HTML Dropdown of all customers.
+	 * Renders an HTML Dropdown of all donors.
 	 *
 	 * @since  1.0
 	 * @access public

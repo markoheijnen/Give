@@ -116,7 +116,7 @@ function give_offline_process_payment( $purchase_data ) {
 		'date'            => $purchase_data['date'],
 		'user_email'      => $purchase_data['user_email'],
 		'purchase_key'    => $purchase_data['purchase_key'],
-		'currency'        => give_get_currency(),
+		'currency'        => give_get_currency( $purchase_data['post_data']['give-form-id'], $purchase_data ),
 		'user_info'       => $purchase_data['user_info'],
 		'status'          => 'pending',
 		'gateway'         => 'offline'
@@ -316,7 +316,7 @@ function give_offline_add_settings( $settings ) {
 			'name'        => __( 'Billing Fields', 'give' ),
 			'desc'        => __( 'This option will enable the billing details section for this form\'s offline donation payment gateway. The fieldset will appear above the offline donation instructions.', 'give' ),
 			'id'          => $prefix . 'offline_donation_enable_billing_fields_single',
-			'row_classes' => 'give-subfield',
+			'row_classes' => 'give-subfield give-hidden',
 			'type'        => 'radio_inline',
 			'default'     => 'disabled',
 			'options'     => array(
@@ -330,18 +330,18 @@ function give_offline_add_settings( $settings ) {
 			'desc'        => __( 'Enter the instructions you want to display to the donor during the donation process. Most likely this would include important information like mailing address and who to make the check out to.', 'give' ),
 			'default'     => give_get_default_offline_donation_content(),
 			'type'        => 'wysiwyg',
-			'row_classes' => 'give-subfield',
+			'row_classes' => 'give-subfield give-hidden',
 			'options'     => array(
 				'textarea_rows' => 6,
-			)
+			),
 		),
 		array(
 			'id'          => $prefix . 'offline_donation_subject',
 			'name'        => __( 'Email Subject', 'give' ),
 			'desc'        => __( 'Enter the subject line for the donation receipt email.', 'give' ),
 			'default'     => __( '{form_title} - Offline Donation Instructions', 'give' ),
-			'row_classes' => 'give-subfield',
-			'type'        => 'text'
+			'row_classes' => 'give-subfield give-hidden',
+			'type'        => 'text',
 		),
 		array(
 			'id'          => $prefix . 'offline_donation_email',
@@ -349,10 +349,10 @@ function give_offline_add_settings( $settings ) {
 			'desc'        => __( 'Enter the instructions you want emailed to the donor after they have submitted the donation form. Most likely this would include important information like mailing address and who to make the check out to.', 'give' ) . ' ' . __( 'Available template tags:', 'give' ) . give_get_emails_tags_list(),
 			'default'     => give_get_default_offline_donation_email_content(),
 			'type'        => 'wysiwyg',
-			'row_classes' => 'give-subfield',
+			'row_classes' => 'give-subfield give-hidden',
 			'options'     => array(
 				'textarea_rows' => 6,
-			)
+			),
 		),
 		array(
 			'name'  => 'offline_docs',
@@ -467,36 +467,6 @@ function give_offline_donation_receipt_status_notice( $notice, $id ) {
 }
 
 add_filter( 'give_receipt_status_notice', 'give_offline_donation_receipt_status_notice', 10, 2 );
-
-/**
- * Add offline payment instruction on payment receipt.
- *
- * @since 1.7
- *
- * @param WP_Post $payment
- *
- * @return mixed
- */
-function give_offline_payment_receipt_after( $payment ) {
-	// Get payment object.
-	$payment = new Give_Payment( $payment->ID );
-
-	// Bailout.
-	if ( 'offline' !== $payment->gateway ) {
-		return false;
-	}
-
-	?>
-    <tr>
-        <td scope="row"><strong><?php esc_html_e( 'Offline Donations Instructions', 'give' ); ?></strong></td>
-        <td>
-			<?php echo give_get_offline_payment_instruction( $payment->form_id, true ); ?>
-        </td>
-    </tr>
-	<?php
-}
-
-add_filter( 'give_payment_receipt_after', 'give_offline_payment_receipt_after' );
 
 /**
  * Get offline payment instructions.

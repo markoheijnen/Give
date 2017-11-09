@@ -257,9 +257,26 @@ function give_get_success_page_url( $query_string = null ) {
 function give_get_failed_transaction_uri( $extras = false ) {
 	$give_options = give_get_settings();
 
-	$uri = ! empty( $give_options['failure_page'] ) ? trailingslashit( get_permalink( $give_options['failure_page'] ) ) : home_url();
+	// Remove question mark.
+	if ( 0 === strpos( $extras, '?' ) ) {
+		$extras = substr( $extras, 1 );
+	}
+
+	$extras_args = wp_parse_args( $extras );
+
+	// Set nonce if payment id exist in extra params.
+	if ( array_key_exists( 'payment-id', $extras_args ) ) {
+		$extras_args['_wpnonce'] = wp_create_nonce( "give-failed-donation-{$extras_args['payment-id']}" );
+		$extras                  = http_build_query( $extras_args );
+	}
+
+	$uri = ! empty( $give_options['failure_page'] ) ?
+		trailingslashit( get_permalink( $give_options['failure_page'] ) ) :
+		home_url();
+
+
 	if ( $extras ) {
-		$uri .= $extras;
+		$uri .= "?{$extras}";
 	}
 
 	return apply_filters( 'give_get_failed_transaction_uri', $uri );
@@ -281,21 +298,29 @@ function give_is_failed_transaction_page() {
 /**
  * Mark payments as Failed when returning to the Failed Donation Page
  *
- * @access      public
- * @since       1.0
- * @return      void
+ * @since  1.0
+ * @since  1.8.16 Add security check
+ *
+ * @return bool
  */
 function give_listen_for_failed_payments() {
 
 	$failed_page = give_get_option( 'failure_page', 0 );
+	$payment_id  = ! empty( $_GET['payment-id'] ) ? absint( $_GET['payment-id'] ) : 0;
+	$nonce       = ! empty( $_GET['_wpnonce'] ) ? give_clean( $_GET['_wpnonce'] ) : false;
 
-	if ( ! empty( $failed_page ) && is_page( $failed_page ) && ! empty( $_GET['payment-id'] ) ) {
-
-		$payment_id = absint( $_GET['payment-id'] );
-		give_update_payment_status( $payment_id, 'failed' );
-
+	// Bailout.
+	if ( ! $failed_page || ! is_page( $failed_page ) || ! $payment_id || ! $nonce ) {
+		return false;
 	}
 
+	// Security check.
+	if ( ! wp_verify_nonce( $nonce, "give-failed-donation-{$payment_id}" ) ) {
+		wp_die( __( 'Nonce verification failed.', 'give' ), __( 'Error', 'give' ) );
+	}
+
+	// Set payment status to failure
+	give_update_payment_status( $payment_id, 'failed' );
 }
 
 add_action( 'template_redirect', 'give_listen_for_failed_payments' );
@@ -554,25 +579,28 @@ function give_get_price_option_name( $form_id = 0, $price_id = 0, $payment_id = 
  *
  * @since 1.0
  *
- * @param int $form_id ID of the form
+ * @param int  $form_id   ID of the form
+ * @param bool $formatted Flag to decide which type of price range string return
  *
  * @return string $range A fully formatted price range
  */
-function give_price_range( $form_id = 0 ) {
+function give_price_range( $form_id = 0, $formatted = true ) {
 	$low        = give_get_lowest_price_option( $form_id );
 	$high       = give_get_highest_price_option( $form_id );
 	$order_type = ! empty( $_REQUEST['order'] ) ? $_REQUEST['order'] : 'asc';
 
 	$range = sprintf(
-		'<span class="give_price_range_%1$s">%2$s</span>
-				<span class="give_price_range_sep">&nbsp;&ndash;&nbsp;</span>
-				<span class="give_price_range_%3$s">%4$s</span>',
+		'<span class="give_price_range_%1$s">%2$s</span><span class="give_price_range_sep">&nbsp;&ndash;&nbsp;</span><span class="give_price_range_%3$s">%4$s</span>',
 		'asc' === $order_type ? 'low' : 'high',
 		'asc' === $order_type ? give_currency_filter( give_format_amount( $low, array( 'sanitize' => false ) ) ) : give_currency_filter( give_format_amount( $high, array( 'sanitize' => false ) ) ),
 		'asc' === $order_type ? 'high' : 'low',
 		'asc' === $order_type ? give_currency_filter( give_format_amount( $high, array( 'sanitize' => false ) ) ) : give_currency_filter( give_format_amount( $low, array( 'sanitize' => false ) ) )
 
 	);
+
+	if( ! $formatted ) {
+		$range = wp_strip_all_tags( $range );
+	}
 
 	return apply_filters( 'give_price_range', $range, $form_id, $low, $high );
 }
