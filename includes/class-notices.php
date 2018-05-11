@@ -57,7 +57,7 @@ class Give_Notices {
 		add_action( 'give_dismiss_notices', array( $this, 'dismiss_notices' ) );
 
 		add_action( 'give_frontend_notices', array( $this, 'render_frontend_notices' ), 999 );
-		add_action( 'give_donation_form_before_personal_info', array( $this, 'render_frontend_notices' ) );
+		add_action( 'give_pre_form', array( $this, 'render_frontend_notices' ), 11 );
 		add_action( 'give_ajax_donation_errors', array( $this, 'render_frontend_notices' ) );
 
 		/**
@@ -410,6 +410,13 @@ class Give_Notices {
 		// Save option to hide notice.
 		Give_Cache::set( $notice_key, true, $notice_dismiss_time, true );
 
+		/**
+		 * Fire the action when notice dismissed
+		 *
+		 * @since 2.0
+		 */
+		do_action( 'give_dismiss_notices', $_post );
+
 		wp_send_json_success();
 	}
 
@@ -599,11 +606,15 @@ class Give_Notices {
 		 * @since 1.8.14
 		 */
 		$default_notice_args = array(
-			'dismissible'      => true,
+			'dismissible'      => false,
+			'dismiss_type'     => 'auto',
 			'dismiss_interval' => 5000,
 		);
 
 		$notice_args = wp_parse_args( $notice_args, $default_notice_args );
+
+		// Notice dismissible must be true for dismiss type.
+		$notice_args['dismiss_type'] = ! $notice_args['dismissible'] ? '' : $notice_args['dismiss_type'];
 
 		/**
 		 * Filter to modify Frontend notice args before notices is display.
@@ -612,17 +623,29 @@ class Give_Notices {
 		 */
 		$notice_args = apply_filters( 'give_frontend_notice_args', $notice_args );
 
+		$close_icon = 'manual' === $notice_args['dismiss_type'] ?
+			sprintf(
+				'<img class="notice-dismiss give-notice-close" src="%s" />',
+				esc_url( GIVE_PLUGIN_URL . 'assets/dist/images/close.svg' )
+
+			) :
+			'';
+
 		// Note: we will remove give_errors class in future.
 		$error = sprintf(
 			'<div class="give_notices give_errors" id="give_error_%1$s">
-				<p class="give_error give_notice give_%1$s" data-dismissible="%2$s" data-dismiss-interval="%3$d">
-					%4$s
-				</p>
-			</div>',
+						<p class="give_error give_notice give_%1$s" data-dismissible="%2$s" data-dismiss-interval="%3$d" data-dismiss-type="%4$s">
+							%5$s
+						</p>
+						%6$s
+					</div>',
 			$notice_type,
 			give_clean( $notice_args['dismissible'] ),
 			absint( $notice_args['dismiss_interval'] ),
-			$message
+			give_clean( $notice_args['dismiss_type'] ),
+			$message,
+			$close_icon
+
 		);
 
 		if ( ! $echo ) {
@@ -630,5 +653,50 @@ class Give_Notices {
 		}
 
 		echo $error;
+	}
+
+	/**
+	 * Print Inline Notice.
+	 * Note: dismissible feature will note work if notice will add to dom by javascript after document load.
+	 *
+	 * @param array $notice_args An array of notice arguments.
+	 *
+	 * @todo   Implement render_admin_notices function within this function in future.
+	 *
+	 * @access public
+	 * @since  1.8.17
+	 *
+	 * @return string
+	 */
+	public function print_admin_notices( $notice_args = array() ) {
+		// Bailout.
+		if ( empty( $notice_args['description'] ) ) {
+			return '';
+		}
+
+		$defaults    = array(
+			'id'          => '',
+			'echo'        => true,
+			'notice_type' => 'warning',
+			'dismissible' => true,
+		);
+		$notice_args = wp_parse_args( $notice_args, $defaults );
+
+		$output    = '';
+		$css_id    = ! empty( $notice_args['id'] ) ? $notice_args['id'] : uniqid( 'give-inline-notice-' );
+		$css_class = "notice-{$notice_args['notice_type']} give-notice notice inline";
+		$css_class .= ( $notice_args['dismissible'] ) ? ' is-dismissible' : '';
+		$output    .= sprintf(
+			'<div id="%1$s" class="%2$s"><p>%3$s</p></div>',
+			$css_id,
+			$css_class,
+			$notice_args['description']
+		);
+
+		if ( ! $notice_args['echo'] ) {
+			return $output;
+		}
+
+		echo $output;
 	}
 }

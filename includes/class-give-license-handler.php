@@ -149,10 +149,10 @@ if ( ! class_exists( 'Give_License' ) ) :
 
 			$this->file             = $_file;
 			$this->item_name        = $_item_name;
-			$this->item_shortname   = 'give_' . preg_replace( '/[^a-zA-Z0-9_\s]/', '', str_replace( ' ', '_', strtolower( $this->item_name ) ) );
+			$this->item_shortname   = self::get_short_name( $this->item_name );
 			$this->version          = $_version;
 			$this->license          = isset( $give_options[ $this->item_shortname . '_license_key' ] ) ? trim( $give_options[ $this->item_shortname . '_license_key' ] ) : '';
-			$this->license_data     = get_option( $this->item_shortname . '_license_active' );
+			$this->license_data     = __give_get_active_license_info( $this->item_shortname );
 			$this->author           = $_author;
 			$this->api_url          = is_null( $_api_url ) ? $this->api_url : $_api_url;
 			$this->checkout_url     = is_null( $_checkout_url ) ? $this->checkout_url : $_checkout_url;
@@ -161,7 +161,7 @@ if ( ! class_exists( 'Give_License' ) ) :
 
 			// Add Setting for Give Add-on activation status.
 			$is_addon_activated = get_option( 'give_is_addon_activated' );
-			if ( ! $is_addon_activated && is_object( $this ) && sizeof( $this ) > 0 ) {
+			if ( ! $is_addon_activated && is_object( $this ) ) {
 				update_option( 'give_is_addon_activated', true );
 				Give_Cache::set( 'give_cache_hide_license_notice_after_activation', true, DAY_IN_SECONDS );
 			}
@@ -170,6 +170,24 @@ if ( ! class_exists( 'Give_License' ) ) :
 			$this->includes();
 			$this->hooks();
 			$this->auto_updater();
+		}
+
+
+		/**
+		 * Get plugin shortname
+		 *
+		 * @since  2.1.0
+		 * @access public
+		 *
+		 * @param $plugin_name
+		 *
+		 * @return string
+		 */
+		public static function get_short_name( $plugin_name ) {
+			$plugin_name = trim( str_replace( 'Give - ', '', $plugin_name ) );
+			$plugin_name = 'give_' . preg_replace( '/[^a-zA-Z0-9_\s]/', '', str_replace( ' ', '_', strtolower( $plugin_name ) ) );
+
+			return $plugin_name;
 		}
 
 		/**
@@ -205,10 +223,10 @@ if ( ! class_exists( 'Give_License' ) ) :
 			add_filter( 'give_settings_licenses', array( $this, 'settings' ), 1 );
 
 			// Activate license key on settings save.
-			add_action( 'admin_init', array( $this, 'activate_license' ) );
+			add_action( 'admin_init', array( $this, 'activate_license' ), 10 );
 
 			// Deactivate license key.
-			add_action( 'admin_init', array( $this, 'deactivate_license' ) );
+			add_action( 'admin_init', array( $this, 'deactivate_license' ), 11 );
 
 			// Updater.
 			add_action( 'admin_init', array( $this, 'auto_updater' ), 0 );
@@ -337,18 +355,15 @@ if ( ! class_exists( 'Give_License' ) ) :
 				return;
 			}
 
-			// Do not simultaneously activate add-ons if the user want to deactivate a specific add-on.
-			foreach ( $_POST as $key => $value ) {
-				if ( false !== strpos( $key, 'license_key_deactivate' ) ) {
-					// Don't activate a key when deactivating a different key
-					return;
-				}
-			}
-
 			// Delete previous license setting if a empty license key submitted.
 			if ( empty( $_POST["{$this->item_shortname}_license_key"] ) ) {
 				$this->unset_license();
 
+				return;
+			}
+
+			// Do not simultaneously activate add-ons if the user want to deactivate a specific add-on.
+			if( $this->is_deactivating_license() ) {
 				return;
 			}
 
@@ -415,17 +430,8 @@ if ( ! class_exists( 'Give_License' ) ) :
 
 			// Run on deactivate button press.
 			if ( isset( $_POST[ $this->item_shortname . '_license_key_deactivate' ] ) ) {
-
-				// Make sure there are no api errors.
-				if ( ! ( $license_data = $this->get_license_info( 'deactivate_license' ) ) ) {
-					return;
-				}
-
-				// Ensure deactivated successfully.
-				if ( isset( $license_data->success ) ) {
-					$this->unset_license();
-				}
-			}// End if().
+				$this->unset_license();
+			}
 		}
 
 		/**
@@ -520,17 +526,14 @@ if ( ! class_exists( 'Give_License' ) ) :
 			 * By default edd software licensing api does not have api to check subscription.
 			 * This is a custom feature to check subscriptions.
 			 */
-			if ( ! ( $subscription_data = $this->get_license_info( 'check_subscription', true ) ) ) {
-				return;
-			}
-
+			$subscription_data = $this->get_license_info( 'check_subscription', true );
 
 			if ( ! empty( $subscription_data['success'] ) && absint( $subscription_data['success'] ) ) {
+
 				$subscriptions = get_option( 'give_subscriptions', array() );
 
 				// Update subscription data only if subscription does not exist already.
 				$subscriptions[ $subscription_data['id'] ] = $subscription_data;
-
 
 				// Initiate default set of license for subscription.
 				if ( ! isset( $subscriptions[ $subscription_data['id'] ]['licenses'] ) ) {
@@ -863,6 +866,7 @@ if ( ! class_exists( 'Give_License' ) ) :
 		 * @return mixed
 		 */
 		public function get_license_info( $edd_action = '', $response_in_array = false ) {
+
 			if ( empty( $edd_action ) ) {
 				return false;
 			}
@@ -901,15 +905,39 @@ if ( ! class_exists( 'Give_License' ) ) :
 		 * @access private
 		 */
 		private function unset_license() {
+
 			// Remove license key from subscriptions if exist.
 			$this->__remove_license_key_from_subscriptions();
 
 			// Remove license from database.
 			delete_option( "{$this->item_shortname}_license_active" );
 			give_delete_option( "{$this->item_shortname}_license_key" );
+			unset( $_POST["{$this->item_shortname}_license_key"] );
 
 			// Unset license param.
 			$this->license = '';
+		}
+
+
+		/**
+		 * Check if deactivating any license key or not.
+		 *
+		 * @since  1.8.17
+		 * @access private
+		 *
+		 * @return bool
+		 */
+		private function is_deactivating_license() {
+			$status = false;
+
+			foreach ( $_POST as $key => $value ) {
+				if ( false !== strpos( $key, 'license_key_deactivate' ) ) {
+					$status = true;
+					break;
+				}
+			}
+
+			return $status;
 		}
 	}
 

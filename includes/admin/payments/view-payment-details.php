@@ -14,14 +14,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! current_user_can( 'view_give_payments' ) ) {
+	wp_die(
+		__( 'Sorry, you are not allowed to access this page.', 'give' ), __( 'Error', 'give' ), array(
+			'response' => 403,
+		)
+	);
+}
+
 /**
- * View Order Details Page
+ * View donation details page
  *
  * @since 1.0
  * @return void
  */
 if ( ! isset( $_GET['id'] ) || ! is_numeric( $_GET['id'] ) ) {
-	wp_die( esc_html__( 'Donation ID not supplied. Please try again.', 'give' ), esc_html__( 'Error', 'give' ), array( 'response' => 400 ) );
+	wp_die( __( 'Donation ID not supplied. Please try again.', 'give' ), __( 'Error', 'give' ), array( 'response' => 400 ) );
 }
 
 // Setup the variables
@@ -31,11 +39,13 @@ $payment    = new Give_Payment( $payment_id );
 // Sanity check... fail if donation ID is invalid
 $payment_exists = $payment->ID;
 if ( empty( $payment_exists ) ) {
-	wp_die( esc_html__( 'The specified ID does not belong to a donation. Please try again.', 'give' ), esc_html__( 'Error', 'give' ), array( 'response' => 400 ) );
+	wp_die( __( 'The specified ID does not belong to a donation. Please try again.', 'give' ), __( 'Error', 'give' ), array( 'response' => 400 ) );
 }
 
-$number         = $payment->number;
-$payment_meta   = $payment->get_meta();
+$number       = $payment->number;
+$payment_meta = $payment->get_meta();
+
+$company_name   = ! empty( $payment_meta['_give_donation_company'] ) ? esc_attr( $payment_meta['_give_donation_company'] ) : '';
 $transaction_id = esc_attr( $payment->transaction_id );
 $user_id        = $payment->user_id;
 $donor_id       = $payment->customer_id;
@@ -46,29 +56,41 @@ $currency_code  = $payment->currency;
 $gateway        = $payment->gateway;
 $currency_code  = $payment->currency;
 $payment_mode   = $payment->mode;
+$base_url       = admin_url( 'edit.php?post_type=give_forms&page=give-payment-history' );
+
 ?>
 <div class="wrap give-wrap">
 
-	<h1 id="transaction-details-heading" class="wp-heading-inline"><?php
+	<h1 id="transaction-details-heading" class="wp-heading-inline">
+	<?php
 		printf(
 			/* translators: %s: donation number */
 			esc_html__( 'Donation %s', 'give' ),
 			$number
 		);
 		if ( $payment_mode == 'test' ) {
-			echo '<span id="test-payment-label" class="give-item-label give-item-label-orange" data-tooltip="' . esc_attr__( 'This donation was made in test mode.', 'give' ) . '" data-tooltip-my-position="center left" data-tooltip-target-position="center right">' . esc_html__( 'Test Donation', 'give' ) . '</span>';
+			echo Give()->tooltips->render_span(array(
+				'label' => __( 'This donation was made in test mode.', 'give' ),
+				'tag_content' => __( 'Test Donation', 'give' ),
+				'position'=> 'right',
+				'attributes' => array(
+					'id' => 'test-payment-label',
+					'class' => 'give-item-label give-item-label-orange'
+				)
+			));
 		}
-		?></h1>
+		?>
+		</h1>
 
 	<?php
 	/**
-	 * Fires in order details page, before the order form.
+	 * Fires in donation details page, before the page content and after the H1 title output.
 	 *
 	 * @since 1.0
 	 *
 	 * @param int $payment_id Payment id.
 	 */
-	do_action( 'give_view_order_details_before', $payment_id );
+	do_action( 'give_view_donation_details_before', $payment_id );
 	?>
 
 	<hr class="wp-header-end">
@@ -76,13 +98,13 @@ $payment_mode   = $payment->mode;
 	<form id="give-edit-order-form" method="post">
 		<?php
 		/**
-		 * Fires in order details page, in the form before the order details.
+		 * Fires in donation details page, in the form before the order details.
 		 *
 		 * @since 1.0
 		 *
 		 * @param int $payment_id Payment id.
 		 */
-		do_action( 'give_view_order_details_form_top', $payment_id );
+		do_action( 'give_view_donation_details_form_top', $payment_id );
 		?>
 		<div id="poststuff">
 			<div id="give-dashboard-widgets-wrap">
@@ -92,36 +114,56 @@ $payment_mode   = $payment->mode;
 
 							<?php
 							/**
-							 * Fires in order details page, before the sidebar.
+							 * Fires in donation details page, before the sidebar.
 							 *
 							 * @since 1.0
 							 *
 							 * @param int $payment_id Payment id.
 							 */
-							do_action( 'give_view_order_details_sidebar_before', $payment_id );
+							do_action( 'give_view_donation_details_sidebar_before', $payment_id );
 							?>
 
 							<div id="give-order-update" class="postbox give-order-data">
 
-								<h3 class="hndle"><?php esc_html_e( 'Update Donation', 'give' ); ?></h3>
+								<div class="give-order-top">
+									<h3 class="hndle"><?php _e( 'Update Donation', 'give' ); ?></h3>
+
+									<?php
+									if ( current_user_can( 'view_give_payments' ) ) {
+										echo sprintf(
+											'<span class="delete-donation" id="delete-donation-%d"><a class="delete-single-donation delete-donation-button dashicons dashicons-trash" href="%s" aria-label="%s"></a></span>',
+											$payment_id,
+											wp_nonce_url(
+												add_query_arg(
+													array(
+														'give-action' => 'delete_payment',
+														'purchase_id' => $payment_id,
+													), $base_url
+												), 'give_donation_nonce'
+											),
+											sprintf( __( 'Delete Donation %s', 'give' ), $payment_id )
+										);
+									}
+									?>
+								</div>
 
 								<div class="inside">
 									<div class="give-admin-box">
 
 										<?php
 										/**
-										 * Fires in order details page, before the sidebar update-payment metabox.
+										 * Fires in donation details page, before the sidebar update-payment metabox.
 										 *
 										 * @since 1.0
 										 *
 										 * @param int $payment_id Payment id.
 										 */
-										do_action( 'give_view_order_details_totals_before', $payment_id );
+										do_action( 'give_view_donation_details_totals_before', $payment_id );
 										?>
 
 										<div class="give-admin-box-inside">
 											<p>
-												<label for="give-payment-status" class="strong"><?php esc_html_e( 'Status:', 'give' ); ?></label>&nbsp;
+												<label for="give-payment-status" class="strong"><?php _e( 'Status:', 'give' ); ?></label>&nbsp;
 												<select id="give-payment-status" name="give-payment-status" class="medium-text">
 													<?php foreach ( give_get_payment_statuses() as $key => $status ) : ?>
 														<option value="<?php echo esc_attr( $key ); ?>"<?php selected( $payment->status, $key, true ); ?>><?php echo esc_html( $status ); ?></option>
@@ -133,14 +175,14 @@ $payment_mode   = $payment->mode;
 
 										<div class="give-admin-box-inside">
 											<p>
-												<label for="give-payment-date" class="strong"><?php esc_html_e( 'Date:', 'give' ); ?></label>&nbsp;
+												<label for="give-payment-date" class="strong"><?php _e( 'Date:', 'give' ); ?></label>&nbsp;
 												<input type="text" id="give-payment-date" name="give-payment-date" value="<?php echo esc_attr( date( 'm/d/Y', $payment_date ) ); ?>" class="medium-text give_datepicker"/>
 											</p>
 										</div>
 
 										<div class="give-admin-box-inside">
 											<p>
-												<label for="give-payment-time-hour" class="strong"><?php esc_html_e( 'Time:', 'give' ); ?></label>&nbsp;
+												<label for="give-payment-time-hour" class="strong"><?php _e( 'Time:', 'give' ); ?></label>&nbsp;
 												<input type="number" step="1" max="24" id="give-payment-time-hour" name="give-payment-time-hour" value="<?php echo esc_attr( date_i18n( 'H', $payment_date ) ); ?>" class="small-text give-payment-time-hour"/>&nbsp;:&nbsp;
 												<input type="number" step="1" max="59" id="give-payment-time-min" name="give-payment-time-min" value="<?php echo esc_attr( date( 'i', $payment_date ) ); ?>" class="small-text give-payment-time-min"/>
 											</p>
@@ -148,7 +190,7 @@ $payment_mode   = $payment->mode;
 
 										<?php
 										/**
-										 * Fires in order details page, in the sidebar update-payment metabox.
+										 * Fires in donation details page, in the sidebar update-payment metabox.
 										 *
 										 * Allows you to add new inner items.
 										 *
@@ -156,25 +198,26 @@ $payment_mode   = $payment->mode;
 										 *
 										 * @param int $payment_id Payment id.
 										 */
-										do_action( 'give_view_order_details_update_inner', $payment_id ); ?>
+										do_action( 'give_view_donation_details_update_inner', $payment_id );
+										?>
 
 										<div class="give-order-payment give-admin-box-inside">
 											<p>
-												<label for="give-payment-total" class="strong"><?php esc_html_e( 'Total Donation:', 'give' ); ?></label>&nbsp;
+												<label for="give-payment-total" class="strong"><?php _e( 'Total Donation:', 'give' ); ?></label>&nbsp;
 												<?php echo give_currency_symbol( $payment->currency ); ?>
-												&nbsp;<input id="give-payment-total" name="give-payment-total" type="text" class="small-text give-price-field" value="<?php echo esc_attr( give_format_decimal( give_get_payment_amount( $payment_id ), false, false ) ); ?>"/>
+												&nbsp;<input id="give-payment-total" name="give-payment-total" type="text" class="small-text give-price-field" value="<?php echo esc_attr( give_format_decimal( give_donation_amount( $payment_id ), false, false ) ); ?>"/>
 											</p>
 										</div>
 
 										<?php
 										/**
-										 * Fires in order details page, after the sidebar update-donation metabox.
+										 * Fires in donation details page, after the sidebar update-donation metabox.
 										 *
 										 * @since 1.0
 										 *
 										 * @param int $payment_id Payment id.
 										 */
-										do_action( 'give_view_order_details_totals_after', $payment_id );
+										do_action( 'give_view_donation_details_totals_after', $payment_id );
 										?>
 
 									</div>
@@ -186,37 +229,49 @@ $payment_mode   = $payment->mode;
 								<div class="give-order-update-box give-admin-box">
 									<?php
 									/**
-									 * Fires in order details page, before the sidebar update-peyment metabox actions buttons.
+									 * Fires in donation details page, before the sidebar update-payment metabox actions buttons.
 									 *
 									 * @since 1.0
 									 *
 									 * @param int $payment_id Payment id.
 									 */
-									do_action( 'give_view_order_details_update_before', $payment_id );
+									do_action( 'give_view_donation_details_update_before', $payment_id );
 									?>
 
 									<div id="major-publishing-actions">
 										<div id="publishing-action">
-											<input type="submit" class="button button-primary right" value="<?php esc_attr_e( 'Save Donation', 'give' ); ?>"/>
-											<?php if ( give_is_payment_complete( $payment_id ) ) : ?>
-												<a href="<?php echo esc_url( add_query_arg( array(
-													'give-action' => 'email_links',
-													'purchase_id' => $payment_id,
-												) ) ); ?>" id="give-resend-receipt" class="button-secondary right"><?php esc_html_e( 'Resend Receipt', 'give' ); ?></a>
-											<?php endif; ?>
+
+											<input type="submit" class="button button-primary right"
+											       value="<?php _e( 'Save Donation', 'give' ); ?>"/>
+
+											<?php
+											if ( give_is_payment_complete( $payment_id ) ) {
+												echo sprintf(
+													'<a href="%1$s" id="give-resend-receipt" class="button-secondary right">%2$s</a>',
+													esc_url(
+														add_query_arg(
+															array(
+																'give-action' => 'email_links',
+																'purchase_id' => $payment_id,
+															)
+														)
+													),
+													__( 'Resend Receipt', 'give' )
+												);
+											}
+											?>
 										</div>
 										<div class="clear"></div>
 									</div>
-
 									<?php
 									/**
-									 * Fires in order details page, after the sidebar update-peyment metabox actions buttons.
+									 * Fires in donation details page, after the sidebar update-payment metabox actions buttons.
 									 *
 									 * @since 1.0
 									 *
 									 * @param int $payment_id Payment id.
 									 */
-									do_action( 'give_view_order_details_update_after', $payment_id );
+									do_action( 'give_view_donation_details_update_after', $payment_id );
 									?>
 
 								</div>
@@ -227,26 +282,27 @@ $payment_mode   = $payment->mode;
 
 							<div id="give-order-details" class="postbox give-order-data">
 
-								<h3 class="hndle"><?php esc_html_e( 'Donation Meta', 'give' ); ?></h3>
+								<h3 class="hndle"><?php _e( 'Donation Meta', 'give' ); ?></h3>
 
 								<div class="inside">
 									<div class="give-admin-box">
 
 										<?php
 										/**
-										 * Fires in order details page, before the donation-meta metabox.
+										 * Fires in donation details page, before the donation-meta metabox.
 										 *
 										 * @since 1.0
 										 *
 										 * @param int $payment_id Payment id.
 										 */
-										do_action( 'give_view_order_details_payment_meta_before', $payment_id );
+										do_action( 'give_view_donation_details_payment_meta_before', $payment_id );
 
 										$gateway = give_get_payment_gateway( $payment_id );
-										if ( $gateway ) : ?>
+										if ( $gateway ) :
+										?>
 											<div class="give-order-gateway give-admin-box-inside">
 												<p>
-													<strong><?php esc_html_e( 'Gateway:', 'give' ); ?></strong>&nbsp;
+													<strong><?php _e( 'Gateway:', 'give' ); ?></strong>&nbsp;
 													<?php echo give_get_gateway_admin_label( $gateway ); ?>
 												</p>
 											</div>
@@ -254,22 +310,26 @@ $payment_mode   = $payment->mode;
 
 										<div class="give-order-payment-key give-admin-box-inside">
 											<p>
-												<strong><?php esc_html_e( 'Key:', 'give' ); ?></strong>&nbsp;
+												<strong><?php _e( 'Key:', 'give' ); ?></strong>&nbsp;
 												<?php echo give_get_payment_key( $payment_id ); ?>
 											</p>
 										</div>
 
 										<div class="give-order-ip give-admin-box-inside">
 											<p>
-												<strong><?php esc_html_e( 'IP:', 'give' ); ?></strong>&nbsp;
+												<strong><?php _e( 'IP:', 'give' ); ?></strong>&nbsp;
 												<?php echo esc_html( give_get_payment_user_ip( $payment_id ) ); ?>
 											</p>
 										</div>
 
-										<?php if ( $transaction_id ) : ?>
+										<?php
+                                        // Display the transaction ID present.
+                                        // The transaction ID is the charge ID from the gateway.
+                                        // For instance, stripe "ch_BzvwYCchqOy5Nt".
+                                        if ( $transaction_id != $payment_id ) : ?>
 											<div class="give-order-tx-id give-admin-box-inside">
 												<p>
-													<strong><?php esc_html_e( 'Donation ID:', 'give' ); ?></strong>&nbsp;
+													<strong><?php _e( 'Transaction ID:', 'give' ); ?> <span class="give-tooltip give-icon give-icon-question"  data-tooltip="<?php echo sprintf( esc_attr__( 'The transaction ID within %s.', 'give' ), $gateway); ?>"></span></strong>&nbsp;
 													<?php echo apply_filters( "give_payment_details_transaction_id-{$gateway}", $transaction_id, $payment_id ); ?>
 												</p>
 											</div>
@@ -277,19 +337,19 @@ $payment_mode   = $payment->mode;
 
 										<div class="give-admin-box-inside">
 											<p><?php $purchase_url = admin_url( 'edit.php?post_type=give_forms&page=give-payment-history&donor=' . absint( give_get_payment_donor_id( $payment_id ) ) ); ?>
-												<a href="<?php echo $purchase_url; ?>"><?php esc_html_e( 'View all donations for this donor &raquo;', 'give' ); ?></a>
+												<a href="<?php echo $purchase_url; ?>"><?php _e( 'View all donations for this donor &raquo;', 'give' ); ?></a>
 											</p>
 										</div>
 
 										<?php
 										/**
-										 * Fires in order details page, after the donation-meta metabox.
+										 * Fires in donation details page, after the donation-meta metabox.
 										 *
 										 * @since 1.0
 										 *
 										 * @param int $payment_id Payment id.
 										 */
-										do_action( 'give_view_order_details_payment_meta_after', $payment_id );
+										do_action( 'give_view_donation_details_payment_meta_after', $payment_id );
 										?>
 
 									</div>
@@ -303,13 +363,13 @@ $payment_mode   = $payment->mode;
 
 							<?php
 							/**
-							 * Fires in order details page, after the sidebar.
+							 * Fires in donation details page, after the sidebar.
 							 *
 							 * @since 1.0
 							 *
 							 * @param int $payment_id Payment id.
 							 */
-							do_action( 'give_view_order_details_sidebar_after', $payment_id );
+							do_action( 'give_view_donation_details_sidebar_after', $payment_id );
 							?>
 
 						</div>
@@ -323,29 +383,29 @@ $payment_mode   = $payment->mode;
 
 							<?php
 							/**
-							 * Fires in order details page, before the main area.
+							 * Fires in donation details page, before the main area.
 							 *
 							 * @since 1.0
 							 *
 							 * @param int $payment_id Payment id.
 							 */
-							do_action( 'give_view_order_details_main_before', $payment_id );
+							do_action( 'give_view_donation_details_main_before', $payment_id );
 							?>
 
 							<?php $column_count = 'columns-3'; ?>
 							<div id="give-donation-overview" class="postbox <?php echo $column_count; ?>">
-								<h3 class="hndle"><?php esc_html_e( 'Donation Information', 'give' ); ?></h3>
+								<h3 class="hndle"><?php _e( 'Donation Information', 'give' ); ?></h3>
 
 								<div class="inside">
 
 									<div class="column-container">
 										<div class="column">
 											<p>
-												<strong><?php esc_html_e( 'Donation Form ID:', 'give' ); ?></strong><br>
+												<strong><?php _e( 'Donation Form ID:', 'give' ); ?></strong><br>
 												<?php
 												if ( $payment_meta['form_id'] ) :
 													printf(
-														'<a href="%1$s">#%2$s</a>',
+														'<a href="%1$s">%2$s</a>',
 														admin_url( 'post.php?action=edit&post=' . $payment_meta['form_id'] ),
 														$payment_meta['form_id']
 													);
@@ -354,31 +414,36 @@ $payment_mode   = $payment->mode;
 											</p>
 											<p>
 												<strong><?php esc_html_e( 'Donation Form Title:', 'give' ); ?></strong><br>
-												<?php echo Give()->html->forms_dropdown( array(
-													'selected' => $payment_meta['form_id'],
-													'name'   => 'give-payment-form-select',
-													'id'     => 'give-payment-form-select',
-													'chosen' => true,
-												) ); ?>
+												<?php
+												echo Give()->html->forms_dropdown(
+													array(
+														'selected' => $payment_meta['form_id'],
+														'name' => 'give-payment-form-select',
+														'id'   => 'give-payment-form-select',
+														'chosen' => true,
+														'placeholder' => '',
+													)
+												);
+												?>
 											</p>
 										</div>
 										<div class="column">
 											<p>
-												<strong><?php esc_html_e( 'Donation Date:', 'give' ); ?></strong><br>
+												<strong><?php _e( 'Donation Date:', 'give' ); ?></strong><br>
 												<?php echo date_i18n( give_date_format(), $payment_date ); ?>
 											</p>
 											<p>
-												<strong><?php esc_html_e( 'Donation Level:', 'give' ); ?></strong><br>
+												<strong><?php _e( 'Donation Level:', 'give' ); ?></strong><br>
 												<span class="give-donation-level">
 													<?php
 													$var_prices = give_has_variable_prices( $payment_meta['form_id'] );
 													if ( empty( $var_prices ) ) {
-														esc_html_e( 'n/a', 'give' );
+														_e( 'n/a', 'give' );
 													} else {
-														$prices_atts = '';
-														if( $variable_prices = give_get_variable_prices( $payment_meta['form_id'] ) ) {
+														$prices_atts = array();
+														if ( $variable_prices = give_get_variable_prices( $payment_meta['form_id'] ) ) {
 															foreach ( $variable_prices as $variable_price ) {
-																$prices_atts[$variable_price['_give_id']['level_id']] = give_format_amount( $variable_price['_give_amount'], array( 'sanitize' => false ) );
+																$prices_atts[ $variable_price['_give_id']['level_id'] ] = give_format_amount( $variable_price['_give_amount'], array( 'sanitize' => false ) );
 															}
 														}
 														// Variable price dropdown options.
@@ -387,8 +452,8 @@ $payment_mode   = $payment->mode;
 															'name'             => 'give-variable-price',
 															'chosen'           => true,
 															'show_option_all'  => '',
-															'show_option_none' => ( '' === get_post_meta( $payment_id, '_give_payment_price_id', true ) ? __( 'None', 'give' )  : '' ),
-															'select_atts'      => 'data-prices=' . esc_attr( json_encode( $prices_atts ) ),
+															'show_option_none' => ( '' === get_post_meta( $payment_id, '_give_payment_price_id', true ) ? __( 'None', 'give' ) : '' ),
+															'select_atts'      => 'data-prices=' . esc_attr( wp_json_encode( $prices_atts ) ),
 															'selected'         => $payment_meta['price_id'],
 														);
 														// Render variable prices select tag html.
@@ -401,12 +466,13 @@ $payment_mode   = $payment->mode;
 										<div class="column">
 											<p>
 												<strong><?php esc_html_e( 'Total Donation:', 'give' ); ?></strong><br>
-												<?php echo give_currency_filter( give_format_amount( $payment->total, array( 'sanitize' => false ) ), give_get_payment_currency_code( $payment->ID ) ); ?>
+												<?php echo give_donation_amount( $payment, true ); ?>
 											</p>
+
 											<p>
 												<?php
 												/**
-												 * Fires in order details page, in the donation-information metabox, before the head elements.
+												 * Fires in donation details page, in the donation-information metabox, before the head elements.
 												 *
 												 * Allows you to add new TH elements at the beginning.
 												 *
@@ -418,7 +484,7 @@ $payment_mode   = $payment->mode;
 
 
 												/**
-												 * Fires in order details page, in the donation-information metabox, after the head elements.
+												 * Fires in donation details page, in the donation-information metabox, after the head elements.
 												 *
 												 * Allows you to add new TH elements at the end.
 												 *
@@ -429,7 +495,7 @@ $payment_mode   = $payment->mode;
 												do_action( 'give_donation_details_thead_after', $payment_id );
 
 												/**
-												 * Fires in order details page, in the donation-information metabox, before the body elements.
+												 * Fires in donation details page, in the donation-information metabox, before the body elements.
 												 *
 												 * Allows you to add new TD elements at the beginning.
 												 *
@@ -440,7 +506,7 @@ $payment_mode   = $payment->mode;
 												do_action( 'give_donation_details_tbody_before', $payment_id );
 
 												/**
-												 * Fires in order details page, in the donation-information metabox, after the body elements.
+												 * Fires in donation details page, in the donation-information metabox, after the body elements.
 												 *
 												 * Allows you to add new TD elements at the end.
 												 *
@@ -462,17 +528,17 @@ $payment_mode   = $payment->mode;
 
 							<?php
 							/**
-							 * Fires in order details page, after the files metabox.
+							 * Fires on the donation details page.
 							 *
 							 * @since 1.0
 							 *
 							 * @param int $payment_id Payment id.
 							 */
-							do_action( 'give_view_order_details_files_after', $payment_id );
+							do_action( 'give_view_donation_details_donor_detail_before', $payment_id );
 							?>
 
 							<div id="give-donor-details" class="postbox">
-								<h3 class="hndle"><?php esc_html_e( 'Donor Details', 'give' ); ?></h3>
+								<h3 class="hndle"><?php _e( 'Donor Details', 'give' ); ?></h3>
 
 								<div class="inside">
 
@@ -481,54 +547,62 @@ $payment_mode   = $payment->mode;
 									<div class="column-container donor-info">
 										<div class="column">
 											<p>
-												<strong><?php esc_html_e( 'Donor ID:', 'give' ); ?></strong><br>
+												<strong><?php _e( 'Donor ID:', 'give' ); ?></strong><br>
 												<?php
 												if ( ! empty( $donor->id ) ) {
 													printf(
-														'<a href="%1$s">#%2$s</a>',
+														'<a href="%1$s">%2$s</a>',
 														admin_url( 'edit.php?post_type=give_forms&page=give-donors&view=overview&id=' . $donor->id ),
 														$donor->id
 													);
 												}
 												?>
+												<span>(<a href="#new" class="give-payment-new-donor"><?php _e( 'Create New Donor', 'give' ); ?></a>)</span>
 											</p>
 											<p>
-												<strong><?php esc_html_e( 'Donor Since:', 'give' ); ?></strong><br>
+												<strong><?php _e( 'Donor Since:', 'give' ); ?></strong><br>
 												<?php echo date_i18n( give_date_format(), strtotime( $donor->date_created ) ) ?>
 											</p>
 										</div>
 										<div class="column">
 											<p>
-												<strong><?php esc_html_e( 'Donor Name:', 'give' ); ?></strong><br>
+												<strong><?php _e( 'Donor Name:', 'give' ); ?></strong><br>
 												<?php
-                                                $donor_billing_name = give_get_donor_name_by( $payment_id, 'donation' );
-                                                $donor_name = give_get_donor_name_by( $donor_id, 'donor' );
+												$donor_billing_name = give_get_donor_name_by( $payment_id, 'donation' );
+												$donor_name         = give_get_donor_name_by( $donor_id, 'donor' );
 
-                                                // Check whether the donor name and WP_User name is same or not.
-                                                if( sanitize_title( $donor_billing_name ) != sanitize_title( $donor_name ) ){
-                                                    echo $donor_billing_name . ' (<a href="' . esc_url( admin_url( "edit.php?post_type=give_forms&page=give-donors&view=overview&id=$donor_id" ) ) . '">' . $donor_name . '</a>)';
-                                                }else{
-                                                    echo $donor_name;
-                                                }
-                                                ?>
+												// Check whether the donor name and WP_User name is same or not.
+												if ( sanitize_title( $donor_billing_name ) != sanitize_title( $donor_name ) ) {
+													echo $donor_billing_name . ' (<a href="' . esc_url( admin_url( "edit.php?post_type=give_forms&page=give-donors&view=overview&id=$donor_id" ) ) . '">' . $donor_name . '</a>)';
+												} else {
+													echo $donor_name;
+												}
+												?>
 											</p>
 											<p>
-												<strong><?php esc_html_e( 'Donor Email:', 'give' ); ?></strong><br>
+												<strong><?php _e( 'Donor Email:', 'give' ); ?></strong><br>
 												<?php echo $donor->email; ?>
 											</p>
 										</div>
 										<div class="column">
 											<p>
-												<strong><?php esc_html_e( 'Change Donor:', 'give' ); ?></strong><br>
+												<strong><?php _e( 'Change Donor:', 'give' ); ?></strong><br>
 												<?php
-												echo Give()->html->donor_dropdown( array(
-													'selected' => $donor->id,
-													'name'     => 'donor-id',
-												) );
+												echo Give()->html->donor_dropdown(
+													array(
+														'selected' => $donor->id,
+														'name' => 'donor-id',
+													)
+												);
 												?>
 											</p>
 											<p>
-												<a href="#new" class="give-payment-new-donor"><?php esc_html_e( 'Create New Donor', 'give' ); ?></a>
+												<?php if ( ! empty( $company_name ) ) {
+													?>
+													<strong><?php esc_html_e( 'Company Name:', 'give' ); ?></strong><br>
+													<?php
+													echo $company_name;
+												} ?>
 											</p>
 										</div>
 									</div>
@@ -536,13 +610,19 @@ $payment_mode   = $payment->mode;
 									<div class="column-container new-donor" style="display: none">
 										<div class="column">
 											<p>
-												<label for="give-new-donor-name"><?php esc_html_e( 'New Donor Name:', 'give' ); ?></label>
-												<input id="give-new-donor-name" type="text" name="give-new-donor-name" value="" class="medium-text"/>
+												<label for="give-new-donor-first-name"><?php _e( 'New Donor First Name:', 'give' ); ?></label>
+												<input id="give-new-donor-first-name" type="text" name="give-new-donor-first-name" value="" class="medium-text"/>
 											</p>
 										</div>
 										<div class="column">
 											<p>
-												<label for="give-new-donor-email"><?php esc_html_e( 'New Donor Email:', 'give' ); ?></label>
+												<label for="give-new-donor-last-name"><?php _e( 'New Donor Last Name:', 'give' ); ?></label>
+												<input id="give-new-donor-last-name" type="text" name="give-new-donor-last-name" value="" class="medium-text"/>
+											</p>
+										</div>
+										<div class="column">
+											<p>
+												<label for="give-new-donor-email"><?php _e( 'New Donor Email:', 'give' ); ?></label>
 												<input id="give-new-donor-email" type="email" name="give-new-donor-email" value="" class="medium-text"/>
 											</p>
 										</div>
@@ -550,13 +630,12 @@ $payment_mode   = $payment->mode;
 											<p>
 												<input type="hidden" name="give-current-donor" value="<?php echo $donor->id; ?>"/>
 												<input type="hidden" id="give-new-donor" name="give-new-donor" value="0"/>
-												<a href="#cancel" class="give-payment-new-donor-cancel give-delete"><?php esc_html_e( 'Cancel', 'give' ); ?></a>
+												<a href="#cancel" class="give-payment-new-donor-cancel give-delete"><?php _e( 'Cancel', 'give' ); ?></a>
 												<br>
-												<em><?php esc_html_e( 'Click "Save Donation" to create new donor.', 'give' ); ?></em>
+												<em><?php _e( 'Click "Save Donation" to create new donor.', 'give' ); ?></em>
 											</p>
 										</div>
 									</div>
-
 									<?php
 									/**
 									 * Fires on the donation details page, in the donor-details metabox.
@@ -587,17 +666,17 @@ $payment_mode   = $payment->mode;
 
 							<?php
 							/**
-							 * Fires in order details page, before the billing metabox.
+							 * Fires on the donation details page, before the billing metabox.
 							 *
 							 * @since 1.0
 							 *
 							 * @param int $payment_id Payment id.
 							 */
-							do_action( 'give_view_order_details_billing_before', $payment_id );
+							do_action( 'give_view_donation_details_billing_before', $payment_id );
 							?>
 
 							<div id="give-billing-details" class="postbox">
-								<h3 class="hndle"><?php esc_html_e( 'Billing Address', 'give' ); ?></h3>
+								<h3 class="hndle"><?php _e( 'Billing Address', 'give' ); ?></h3>
 
 								<div class="inside">
 
@@ -617,71 +696,79 @@ $payment_mode   = $payment->mode;
 
 												<div class="row">
 													<div id="give-order-address-country-wrap">
-														<label class="order-data-address-line"><?php esc_html_e( 'Country:', 'give' ); ?></label>
+														<label class="order-data-address-line"><?php _e( 'Country:', 'give' ); ?></label>
 														<?php
-														echo Give()->html->select( array(
-															'options'          => give_get_country_list(),
-															'name'             => 'give-payment-address[0][country]',
-															'selected'         => $address['country'],
-															'show_option_all'  => false,
-															'show_option_none' => false,
-															'chosen'           => true,
-															'placeholder'      => esc_attr__( 'Select a country', 'give' ),
-															'data'             => array( 'search-type' => 'no_ajax' ),
-														) );
+														echo Give()->html->select(
+															array(
+																'options'          => give_get_country_list(),
+																'name'             => 'give-payment-address[0][country]',
+																'selected'         => $address['country'],
+																'show_option_all'  => false,
+																'show_option_none' => false,
+																'chosen'           => true,
+																'placeholder'      => esc_attr__( 'Select a country', 'give' ),
+																'data'             => array( 'search-type' => 'no_ajax' ),
+															)
+														);
 														?>
 													</div>
 												</div>
 
 												<div class="row">
 													<div class="give-wrap-address-line1">
-														<label for="give-payment-address-line1" class="order-data-address"><?php esc_html_e( 'Address 1:', 'give' ); ?></label>
+														<label for="give-payment-address-line1" class="order-data-address"><?php _e( 'Address 1:', 'give' ); ?></label>
 														<input id="give-payment-address-line1" type="text" name="give-payment-address[0][line1]" value="<?php echo esc_attr( $address['line1'] ); ?>" class="medium-text"/>
 													</div>
 												</div>
 
 												<div class="row">
 													<div class="give-wrap-address-line2">
-														<label for="give-payment-address-line2" class="order-data-address-line"><?php esc_html_e( 'Address 2:', 'give' ); ?></label>
+														<label for="give-payment-address-line2" class="order-data-address-line"><?php _e( 'Address 2:', 'give' ); ?></label>
 														<input id="give-payment-address-line2" type="text" name="give-payment-address[0][line2]" value="<?php echo esc_attr( $address['line2'] ); ?>" class="medium-text"/>
 													</div>
 												</div>
 
 												<div class="row">
-													<div id="give-order-address-state-wrap" class="<?php echo ( ! empty( $address['country'] ) && array_key_exists( $address['country'], $no_states_country ) ? 'give-hidden' : '' ); ?>">
-														<label for="give-payment-address-state" class="order-data-address-line"><?php esc_html_e( 'State / Province / County:', 'give' ); ?></label>
-														<?php
-														$states = give_get_states( $address['country'] );
-														if ( ! empty( $states ) ) {
-															echo Give()->html->select( array(
-																'options'          => $states,
-																'name'             => 'give-payment-address[0][state]',
-																'selected'         => $address['state'],
-																'show_option_all'  => false,
-																'show_option_none' => false,
-																'chosen'           => true,
-																'placeholder'      => esc_attr__( 'Select a state', 'give' ),
-																'data'             => array( 'search-type' => 'no_ajax' ),
-															) );
-														} else {
-															?>
-															<input id="give-payment-address-state" type="text" name="give-payment-address[0][state]" value="<?php echo esc_attr( $address['state'] ); ?>" class="medium-text"/>
-															<?php
-														} ?>
+													<div class="give-wrap-address-city">
+														<label for="give-payment-address-city" class="order-data-address-line"><?php esc_html_e( 'City:', 'give' ); ?></label>
+														<input id="give-payment-address-city" type="text" name="give-payment-address[0][city]" value="<?php echo esc_attr( $address['city'] ); ?>" class="medium-text"/>
 													</div>
 												</div>
 
+												<?php
+												$state_exists = ( ! empty( $address['country'] ) && array_key_exists( $address['country'], $no_states_country ) ? true : false );
+												?>
 												<div class="row">
-													<div class="column">
-														<div class="give-wrap-address-city">
-															<label for="give-payment-address-city" class="order-data-address-line"><?php esc_html_e( 'City:', 'give' ); ?></label>
-															<input id="give-payment-address-city" type="text" name="give-payment-address[0][city]" value="<?php echo esc_attr( $address['city'] ); ?>" class="medium-text"/>
+													<div class="<?php echo( ! empty( $state_exists ) ? 'column-full' : 'column' ); ?> give-column give-column-state">
+														<div id="give-order-address-state-wrap" class="<?php echo( ! empty( $state_exists ) ? 'give-hidden' : '' ); ?>">
+															<label for="give-payment-address-state" class="order-data-address-line"><?php esc_html_e( 'State / Province / County:', 'give' ); ?></label>
+															<?php
+															$states = give_get_states( $address['country'] );
+															if ( ! empty( $states ) ) {
+																echo Give()->html->select(
+																	array(
+																		'options'          => $states,
+																		'name'             => 'give-payment-address[0][state]',
+																		'selected'         => $address['state'],
+																		'show_option_all'  => false,
+																		'show_option_none' => false,
+																		'chosen'           => true,
+																		'placeholder'      => esc_attr__( 'Select a state', 'give' ),
+																		'data'             => array( 'search-type' => 'no_ajax' ),
+																	)
+																);
+															} else {
+																?>
+																<input id="give-payment-address-state" type="text" name="give-payment-address[0][state]" value="<?php echo esc_attr( $address['state'] ); ?>" class="medium-text"/>
+																<?php
+															}
+															?>
 														</div>
 													</div>
 
-													<div class="column">
+													<div class="<?php echo( ! empty( $state_exists ) ? 'column-full' : 'column' ); ?> give-column give-column-zip">
 														<div class="give-wrap-address-zip">
-															<label for="give-payment-address-zip" class="order-data-address-line"><?php esc_html_e( 'Zip / Postal Code:', 'give' ); ?></label>
+															<label for="give-payment-address-zip" class="order-data-address-line"><?php _e( 'Zip / Postal Code:', 'give' ); ?></label>
 															<input id="give-payment-address-zip" type="text" name="give-payment-address[0][zip]" value="<?php echo esc_attr( $address['zip'] ); ?>" class="medium-text"/>
 														</div>
 													</div>
@@ -693,7 +780,7 @@ $payment_mode   = $payment->mode;
 
 									<?php
 									/**
-									 * Fires in order details page, in the billing metabox, after all the fields.
+									 * Fires in donation details page, in the billing metabox, after all the fields.
 									 *
 									 * Allows you to insert new billing address fields.
 									 *
@@ -711,17 +798,17 @@ $payment_mode   = $payment->mode;
 
 							<?php
 							/**
-							 * Fires in order details page, after the billing metabox.
+							 * Fires on the donation details page, after the billing metabox.
 							 *
 							 * @since 1.0
 							 *
 							 * @param int $payment_id Payment id.
 							 */
-							do_action( 'give_view_order_details_billing_after', $payment_id );
+							do_action( 'give_view_donation_details_billing_after', $payment_id );
 							?>
 
 							<div id="give-payment-notes" class="postbox">
-								<h3 class="hndle"><?php esc_html_e( 'Donation Notes', 'give' ); ?></h3>
+								<h3 class="hndle"><?php _e( 'Donation Notes', 'give' ); ?></h3>
 
 								<div class="inside">
 									<div id="give-payment-notes-inner">
@@ -737,12 +824,14 @@ $payment_mode   = $payment->mode;
 										} else {
 											$no_notes_display = '';
 										}
-										echo '<p class="give-no-payment-notes"' . $no_notes_display . '>' . esc_html__( 'No donation notes.', 'give' ) . '</p>'; ?>
+
+										echo '<p class="give-no-payment-notes"' . $no_notes_display . '>' . esc_html__( 'No donation notes.', 'give' ) . '</p>';
+										?>
 									</div>
 									<textarea name="give-payment-note" id="give-payment-note" class="large-text"></textarea>
 
 									<div class="give-clearfix">
-										<button id="give-add-payment-note" class="button button-secondary button-small" data-payment-id="<?php echo absint( $payment_id ); ?>"><?php esc_html_e( 'Add Note', 'give' ); ?></button>
+										<button id="give-add-payment-note" class="button button-secondary button-small" data-payment-id="<?php echo absint( $payment_id ); ?>"><?php _e( 'Add Note', 'give' ); ?></button>
 									</div>
 
 								</div>
@@ -752,13 +841,13 @@ $payment_mode   = $payment->mode;
 
 							<?php
 							/**
-							 * Fires in order details page, after the main area.
+							 * Fires on the donation details page, after the main area.
 							 *
 							 * @since 1.0
 							 *
 							 * @param int $payment_id Payment id.
 							 */
-							do_action( 'give_view_order_details_main_after', $payment_id );
+							do_action( 'give_view_donation_details_main_after', $payment_id );
 							?>
 
 						</div>
@@ -774,13 +863,13 @@ $payment_mode   = $payment->mode;
 
 		<?php
 		/**
-		 * Fires in order details page, in the form after the order details.
+		 * Fires in donation details page, in the form after the order details.
 		 *
 		 * @since 1.0
 		 *
 		 * @param int $payment_id Payment id.
 		 */
-		do_action( 'give_view_order_details_form_bottom', $payment_id );
+		do_action( 'give_view_donation_details_form_bottom', $payment_id );
 
 		wp_nonce_field( 'give_update_payment_details_nonce' );
 		?>
@@ -789,12 +878,12 @@ $payment_mode   = $payment->mode;
 	</form>
 	<?php
 	/**
-	 * Fires in order details page, after the order form.
+	 * Fires in donation details page, after the order form.
 	 *
 	 * @since 1.0
 	 *
 	 * @param int $payment_id Payment id.
 	 */
-	do_action( 'give_view_order_details_after', $payment_id );
+	do_action( 'give_view_donation_details_after', $payment_id );
 	?>
 </div><!-- /.wrap -->

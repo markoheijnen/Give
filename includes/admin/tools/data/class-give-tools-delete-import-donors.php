@@ -103,6 +103,15 @@ class Give_Tools_Import_Donors extends Give_Batch_Export {
 	public $donor_ids = array();
 
 	/**
+	 * Constructor.
+	 */
+	public function __construct( $_step = 1 ) {
+		parent::__construct( $_step );
+
+		$this->is_writable = true;
+	}
+
+	/**
 	 * Get the Export Data
 	 *
 	 * @access public
@@ -188,7 +197,7 @@ class Give_Tools_Import_Donors extends Give_Batch_Export {
 				// Add the donation id in side the array.
 				$donation_ids[] = $post->ID;
 
-				$donor_id = (int) get_post_meta( $post->ID, '_give_payment_customer_id', true );
+				$donor_id = (int) give_get_meta( $post->ID, '_give_payment_customer_id', true );
 				if ( ! empty( $donor_id ) ) {
 					$donor = new Give_Donor( $donor_id );
 					if ( ! empty( $donor->id ) ) {
@@ -254,7 +263,11 @@ class Give_Tools_Import_Donors extends Give_Batch_Export {
 	public function process_step() {
 
 		if ( ! $this->can_export() ) {
-			wp_die( __( 'You do not have permission to delete Import transactions.', 'give' ), __( 'Error', 'give' ), array( 'response' => 403 ) );
+			wp_die(
+				esc_html__( 'You do not have permission to delete Import transactions.', 'give' ),
+				esc_html__( 'Error', 'give' ),
+				array( 'response' => 403 )
+			);
 		}
 
 		$had_data = $this->get_data();
@@ -268,11 +281,6 @@ class Give_Tools_Import_Donors extends Give_Batch_Export {
 			Give_Cache::delete( Give_Cache::get_key( 'give_estimated_monthly_stats' ) );
 
 			$this->delete_option( $this->donation_key );
-
-			// Reset the sequential order numbers
-			if ( give_get_option( 'enable_sequential' ) ) {
-				delete_option( 'give_last_payment_number' );
-			}
 
 			$this->done    = true;
 			$this->message = __( 'Imported donor and transactions successfully deleted.', 'give' );
@@ -321,7 +329,6 @@ class Give_Tools_Import_Donors extends Give_Batch_Export {
 			$this->total_step     = ( ( count( $donation_ids ) / $this->per_step ) * 2 ) + count( $donor_ids );
 			$this->step_completed = $page;
 
-
 			if ( $count > $this->per_step ) {
 
 				$this->update_option( $this->step_on_key, $page );
@@ -344,14 +351,15 @@ class Give_Tools_Import_Donors extends Give_Batch_Export {
 			$form_ids = (array) $this->get_option( $this->form_key );
 
 			foreach ( $donation_ids as $item ) {
-				$form_ids[] = get_post_meta( $item, '_give_payment_form_id', true );
-				wp_delete_post( $item, true );
+				$form_ids[] = give_get_meta( $item, '_give_payment_form_id', true );
+
+				// Delete the main payment.
+				give_delete_donation( absint( $item ) );
 			}
 
 			// update the new form list.
 			$this->update_option( $this->form_key, $form_ids );
 		}
-
 
 		// Here we delete all the donor
 		if ( 3 === $step ) {
@@ -377,7 +385,7 @@ class Give_Tools_Import_Donors extends Give_Batch_Export {
 				$args = apply_filters( 'give_tools_reset_stats_total_args', array(
 					'post_status'    => 'any',
 					'posts_per_page' => 1,
-					'author'         => $donor_ids[ $page ]
+					'author'         => $donor_ids[ $page ],
 				) );
 
 				$donations = array();
@@ -391,7 +399,9 @@ class Give_Tools_Import_Donors extends Give_Batch_Export {
 					 *
 					 * @since 1.8.14
 					 */
-					if ( 'on' === (string) $_REQUEST['delete-import-donors'] ) {
+					$delete_import_donors = isset( $_REQUEST['delete-import-donors'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['delete-import-donors'] ) ) : '';
+
+					if ( 'on' === (string) $delete_import_donors ) {
 						wp_delete_user( $donor_ids[ $page ] );
 					}
 				} else {

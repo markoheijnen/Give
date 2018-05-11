@@ -271,7 +271,7 @@ abstract class Give_Shortcode_Generator {
 	}
 
 	/**
-	 * Generate a TinyMCE listbox field for a post_type
+	 * Generate a TinyMCE listbox field for a post_type.
 	 *
 	 * @param array $field
 	 *
@@ -289,12 +289,15 @@ abstract class Give_Shortcode_Generator {
 		);
 
 		$args    = wp_parse_args( (array) $field['query_args'], $args );
-		$posts   = get_posts( $args );
+		$posts   = new WP_Query( $args );
 		$options = array();
 
-		if ( $posts ) {
-			foreach ( $posts as $post ) {
-				$options[ absint( $post->ID ) ] = ( empty( $post->post_title ) ? sprintf( __( 'Untitled (#%s)', 'give' ), $post->ID ) : $post->post_title );
+		if ( $posts->have_posts() ) {
+			while ( $posts->have_posts() ) {
+				$posts->the_post();
+				$post_title = get_the_title();
+				$post_id = get_the_ID();
+				$options[ absint( $post_id ) ] = ( empty( $post_title ) ? sprintf( __( 'Untitled (#%s)', 'give' ), $post_id ) : $post_title );
 			}
 
 			$field['type']    = 'listbox';
@@ -321,17 +324,23 @@ abstract class Give_Shortcode_Generator {
 	protected function generate_textbox( $field ) {
 
 		$textbox = shortcode_atts( array(
-			'label'     => '',
-			'maxLength' => '',
-			'minHeight' => '',
-			'minWidth'  => '',
-			'multiline' => false,
-			'name'      => false,
-			'tooltip'   => '',
-			'type'      => '',
-			'value'     => '',
-			'classes'   => ''
+			'label'       => '',
+			'maxLength'   => '',
+			'minHeight'   => '',
+			'minWidth'    => '',
+			'multiline'   => false,
+			'name'        => false,
+			'tooltip'     => '',
+			'type'        => '',
+			'value'       => '',
+			'classes'     => '',
+			'placeholder' => ''
 		), $field );
+
+		// Remove empty placeholder.
+		if( empty( $textbox['placeholder'] ) ) {
+			unset( $textbox['placeholder'] );
+		}
 
 		if ( $this->validate( $field ) ) {
 			return array_filter( $textbox, array( $this, 'return_textbox_value' ) );

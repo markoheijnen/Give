@@ -58,8 +58,12 @@ function give_generate_pdf( $data ) {
 	$custom_font  = 'dejavusans';
 	$font_style   = '';
 
-	if ( file_exists( GIVE_PLUGIN_DIR . '/includes/libraries/tcpdf/fonts/CODE2000.TTF' ) &&
-	     in_array( give_get_currency(), array( 'RIAL', 'RUB' ) ) ) {
+	if (
+		file_exists( GIVE_PLUGIN_DIR . '/includes/libraries/tcpdf/fonts/CODE2000.TTF' ) &&
+
+		// RIAL exist for backward compatibility.
+		in_array( give_get_currency(), array( 'RIAL', 'RUB', 'IRR' ) )
+	) {
 		TCPDF_FONTS::addTTFfont( GIVE_PLUGIN_DIR . '/includes/libraries/tcpdf/fonts/CODE2000.TTF', '' );
 		$custom_font = 'CODE2000';
 		$font_style  = 'B';
@@ -71,7 +75,8 @@ function give_generate_pdf( $data ) {
 	$pdf->SetAuthor( utf8_decode( __( 'Give - Democratizing Generosity', 'give' ) ) );
 	$pdf->SetCreator( utf8_decode( __( 'Give - Democratizing Generosity', 'give' ) ) );
 
-	$pdf->Image( apply_filters( 'give_pdf_export_logo', GIVE_PLUGIN_URL . 'assets/images/give-logo-small.png' ), 247, 8 );
+	// Image URL should have absolute path. @see https://tcpdf.org/examples/example_009/.
+	$pdf->Image( apply_filters( 'give_pdf_export_logo', GIVE_PLUGIN_DIR . 'assets/dist/images/give-logo-small.png' ), 247, 8 );
 
 	$pdf->SetMargins( 8, 8, 8 );
 	$pdf->SetX( 8 );
@@ -128,9 +133,9 @@ function give_generate_pdf( $data ) {
 			$title = $form->post_title;
 
 			if ( give_has_variable_prices( $form->ID ) ) {
-				$price = html_entity_decode( give_price_range( $form->ID, false ) );
+				$price = html_entity_decode( give_price_range( $form->ID, false ), ENT_COMPAT, 'UTF-8' );
 			} else {
-				$price = give_currency_filter( give_get_form_price( $form->ID ), '', true );
+				$price = give_currency_filter( give_get_form_price( $form->ID ), array( 'decode_currency' => true ) );
 			}
 
 			// Display Categories Data only, if user has opted for it.
@@ -148,7 +153,7 @@ function give_generate_pdf( $data ) {
 			}
 
 			$sales    = give_get_form_sales_stats( $form->ID );
-			$earnings = give_currency_filter( give_format_amount( give_get_form_earnings_stats( $form->ID ), array( 'sanitize' => false, ) ), '', true );
+			$earnings = give_currency_filter( give_format_amount( give_get_form_earnings_stats( $form->ID ), array( 'sanitize' => false, ) ), array( 'decode_currency' => true ) );
 
 			// This will help filter data before appending it to PDF Receipt.
 			$prepare_pdf_data   = array();
@@ -200,6 +205,7 @@ function give_generate_pdf( $data ) {
 	$pdf->Image( $image . '&file=.png' );
 	$pdf->Ln( 7 );
 	$pdf->Output( apply_filters( 'give_sales_earnings_pdf_export_filename', 'give-report-' . date_i18n( 'Y-m-d' ) ) . '.pdf', 'D' );
+	exit();
 }
 
 add_action( 'give_generate_pdf', 'give_generate_pdf' );

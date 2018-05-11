@@ -38,6 +38,14 @@ class GIVE_CLI_COMMAND {
 	 */
 	private $api;
 
+	/**
+	 * This helps to get unique name.
+	 *
+	 * @since 1.8.17
+	 * @var array
+	 */
+	private $new_donor_names = array();
+
 
 	/**
 	 * GIVE_CLI_Command constructor.
@@ -69,7 +77,7 @@ class GIVE_CLI_COMMAND {
 	 * @subcommand    logo
 	 */
 	public function ascii( $args, $assoc_args ) {
-		WP_CLI::log( file_get_contents( GIVE_PLUGIN_DIR . 'assets/images/give-ascii-logo.txt' ) );
+		WP_CLI::log( file_get_contents( GIVE_PLUGIN_DIR . 'assets/dist/images/give-ascii-logo.txt' ) );
 	}
 
 
@@ -379,6 +387,11 @@ class GIVE_CLI_COMMAND {
 		$start    = time();
 
 		if ( $create ) {
+			if ( 80 < $create ) {
+				WP_CLI::warning( 'Currently we can only generate maximum 80 donors.', 'give' );
+				$create = 80;
+			}
+
 			$number = 1;
 
 			if ( isset( $assoc_args['email'] ) && ! is_email( $email ) ) {
@@ -394,11 +407,8 @@ class GIVE_CLI_COMMAND {
 			}
 
 			for ( $i = 0; $i < $number; $i ++ ) {
-				if ( ! $email ) {
-
-					// Generate fake email.
-					$email = 'customer-' . uniqid() . '@test.com';
-				}
+				$name  = $name ? $name : $this->get_random_name();
+				$email = $email ? $email : $this->get_random_email( $name );
 
 				$args = array(
 					'email' => $email,
@@ -413,8 +423,8 @@ class GIVE_CLI_COMMAND {
 					WP_CLI::error( __( 'Failed to create donor', 'give' ) );
 				}
 
-				// Reset email to false so it is generated on the next loop (if creating donors).
-				$email = false;
+				// Reset email and name to false so it is generated on the next loop (if creating donors).
+				$email = $name = false;
 			}
 
 			WP_CLI::line( $this->color_message( sprintf( __( '%1$d donors created in %2$d seconds', 'give' ), $number, time() - $start ) ) );
@@ -656,10 +666,10 @@ class GIVE_CLI_COMMAND {
 	 * : A specific date range to retrieve stats for
 	 *
 	 * [--start-date=<date>]
-	 * : The start date of a date range to retrieve stats for
+	 * : The start date of a date range to retrieve stats for. Date format is MM/DD/YYYY
 	 *
 	 * [--end-date=<date>]
-	 * : The end date of a date range to retrieve stats for
+	 * : The end date of a date range to retrieve stats for. Date format is MM/DD/YYYY
 	 *
 	 * ## EXAMPLES
 	 *
@@ -698,7 +708,7 @@ class GIVE_CLI_COMMAND {
 		$earnings = $stats->get_earnings( $form_id, $start_date, $end_date );
 		$sales    = $stats->get_sales( $form_id, $start_date, $end_date );
 
-		WP_CLI::line( $this->color_message( __( 'Earnings', 'give' ), give_currency_filter( $earnings ) ) );
+		WP_CLI::line( $this->color_message( __( 'Earnings', 'give' ), give_currency_filter( $earnings, array( 'decode_currency' => true ) ) ) );
 		WP_CLI::line( $this->color_message( __( 'Sales', 'give' ), $sales ) );
 	}
 
@@ -737,7 +747,7 @@ class GIVE_CLI_COMMAND {
 		}
 
 		switch ( $action ) {
-			case 'delete' :
+			case 'delete':
 				// Reset counter.
 				self::$counter = 1;
 
@@ -910,7 +920,7 @@ class GIVE_CLI_COMMAND {
 		/* @var Give_Payment|object $donation Payment object. */
 		foreach ( $donations as $donation ) {
 
-			if ( in_array( $donation->customer_id, $skip_donors ,true ) ) {
+			if ( in_array( $donation->customer_id, $skip_donors, true ) ) {
 				continue;
 			}
 
@@ -924,5 +934,140 @@ class GIVE_CLI_COMMAND {
 		}
 
 		return $donors;
+	}
+
+	/**
+	 * Get random user name
+	 *
+	 * @since 1.8.17
+	 * @return string
+	 */
+	private function get_random_name() {
+		// First names.
+		$names = array(
+			'Devin',
+			'Christopher',
+			'Ryan',
+			'Ethan',
+			'John',
+			'Zoey',
+			'Sarah',
+			'Michelle',
+			'Samantha',
+		);
+
+		// Surnames.
+		$surnames = array(
+			'Walker',
+			'Josh',
+			'Thompson',
+			'Anderson',
+			'Johnson',
+			'Tremblay',
+			'Peltier',
+			'Cunningham',
+			'Simpson',
+			'Mercado',
+			'Sellers',
+		);
+
+		// Generate a random forename.
+		$random_name = $names[ mt_rand( 0, sizeof( $names ) - 1 ) ];
+
+		// Generate a random surname.
+		$random_surname = $surnames[ mt_rand( 0, sizeof( $surnames ) - 1 ) ];
+
+		// Generate name.
+		$name = "{$random_name} {$random_surname}";
+
+		if ( in_array( $name, $this->new_donor_names ) ) {
+			$name = $this->get_random_name();
+		}
+
+		// Collect new donor names.
+		$this->new_donor_names[] = $name;
+
+		return $name;
+	}
+
+	/**
+	 * Get random email
+	 *
+	 * @since 1.8.17
+	 *
+	 * @param string $name
+	 *
+	 * @return string
+	 */
+	private function get_random_email( $name ) {
+		return implode( '.', explode( ' ', strtolower( $name ) ) ) . '@test.com';
+	}
+
+	/**
+	 * Toggle settings for Give's test mode.
+	 *
+	 * [--enable]
+	 * : Enable Give's test mode
+	 *
+	 * [--disable]
+	 * : Enable Give's test mode
+	 *
+	 * @when after_wp_load
+	 * @subcommand test-mode
+	 */
+	public function test_mode( $args, $assoc ) {
+
+		// Return if associative arguments are not specified.
+		if ( empty( $assoc ) ) {
+			WP_CLI::error( "--enable or --disable flag is missing." );
+			return;
+		}
+
+		$enabled_gateways = give_get_option( 'gateways' );
+		$default_gateway  = give_get_option( 'default_gateway' );
+
+
+		// Enable Test Mode.
+		if ( true === WP_CLI\Utils\get_flag_value( $assoc, 'enable' ) ) {
+
+			// Set `Test Mode` to `enabled`.
+			give_update_option( 'test_mode', 'enabled' );
+
+
+			// Enable `Test Donation` gateway.
+			$enabled_gateways['manual'] = "1";
+			give_update_option( 'gateways', $enabled_gateways );
+
+
+			// Set `Test Donation` as default gateway.
+			add_option( 'give_test_mode_default_gateway', $default_gateway );
+			give_update_option( 'default_gateway', 'manual' );
+
+
+			// Show success message on completion.
+			WP_CLI::success( 'Give Test mode enabled' );
+		}
+
+		// Disable Test Mode.
+		if ( true === WP_CLI\Utils\get_flag_value( $assoc, 'disable' ) ) {
+
+			// Set `Test Mode` to `disabled`.
+			give_update_option( 'test_mode', 'disabled' );
+
+
+			// Disable `Test Donation` gateway.
+			unset( $enabled_gateways['manual'] );
+			give_update_option( 'gateways', $enabled_gateways );
+
+
+			// Backup `Default Gateway` setting for restore on test mode disable.
+			$default_gateway_backup = get_option( 'give_test_mode_default_gateway' );
+			give_update_option( 'default_gateway', $default_gateway_backup );
+			delete_option( 'give_test_mode_default_gateway' );
+
+
+			// Show success message on completion.
+			WP_CLI::success( 'Give Test mode disabled' );
+		}
 	}
 }

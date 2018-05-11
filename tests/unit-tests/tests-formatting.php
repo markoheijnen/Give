@@ -46,16 +46,16 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 			$this->assertArrayHasKey( $key, $currency_settings );
 			$this->assertEquals( $expected[ $key ], $currency_settings[ $key ] );
 		}
-		
+
 
 		/**
 		 * Cse 2: Payment
 		 */
 		// Create Simple Donation.
-		$donation_id       = Give_Helper_Payment::create_simple_payment(
+		$donation_id = Give_Helper_Payment::create_simple_payment(
 			array(
 				'donation' => array(
-					'currency' => $currency_code
+					'currency' => $currency_code,
 				),
 			)
 		);
@@ -119,12 +119,12 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 	/**
 	 * Test give_get_price_decimal_separator function
 	 *
-	 * @since 1.8
+	 * @since        1.8
 	 *
 	 * @param string $currency_code
 	 * @param array  $expected
 	 *
-	 * @cover give_get_price_decimal_separator
+	 * @cover        give_get_price_decimal_separator
 	 * @dataProvider give_get_currency_formatting_settings_provider
 	 */
 	function test_give_get_price_decimal_separator( $currency_code, $expected ) {
@@ -159,7 +159,7 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 	 */
 	function test_give_sanitize_amount( $amount, $expected, $dp = false, $trim_zeros = false ) {
 
-		$output = give_sanitize_amount( $amount, $dp, $trim_zeros );
+		$output = give_sanitize_amount( $amount, array( 'number_decimals' => $dp, 'trim_zeros' => $trim_zeros ) );
 
 		$this->assertSame(
 			$expected,
@@ -191,6 +191,11 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 			array( '1,000,000.00', '1000000', false, true ),
 			array( '10,000.00', '10000', false, true ),
 			array( '100.00', '100', false, true ),
+			array( '1,000,000,000,000.120', '1000000000000.1', 1, true ),
+			array( '1,000,000,000.240', '1000000000.24', 2, true ),
+			array( '1,000,000.560', '1000000.6', 1, true ),
+			array( '10,000.768000', '10000.77', 2, true ),
+			array( '100.87850000', '100.879', 3, true ),
 		);
 	}
 
@@ -200,26 +205,26 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 	 *
 	 * @since        1.8
 	 *
-	 * @param string   $amount
-	 * @param string   $expected
-	 * @param array   $currency_settings
+	 * @param string $amount
+	 * @param string $expected
+	 * @param array  $currency_settings
 	 *
 	 * @cover        give_format_amount
 	 * @dataProvider give_format_amount_provider
 	 */
 	function test_give_format_amount( $amount, $expected, $currency_settings = array() ) {
 		// Currency.
-		if( ! empty( $currency_settings[0] ) ) {
+		if ( ! empty( $currency_settings[0] ) ) {
 			give_update_option( 'currency', $currency_settings[0] );
 		}
 
 		// Thousand separator.
-		if( ! empty( $currency_settings[1] ) ) {
+		if ( ! empty( $currency_settings[1] ) ) {
 			give_update_option( 'thousands_separator', $currency_settings[1] );
 		}
 
 		// Decimal separator.
-		if( ! empty( $currency_settings[2] ) ) {
+		if ( ! empty( $currency_settings[2] ) ) {
 			give_update_option( 'decimal_separator', $currency_settings[2] );
 		}
 
@@ -229,17 +234,27 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 			default:
 				// Test 1: without decimal
 				give_update_option( 'number_decimals', 0 );
-				$output = give_format_amount( $amount, array( 'decimal' => false, 'sanitize' => ! is_numeric( $amount ), 'currency' => $currency ) );
+				$output = give_format_amount( $amount, array(
+					'decimal'  => false,
+					'sanitize' => ! is_numeric( $amount ),
+					'currency' => $currency,
+				) );
 				$this->assertSame( $expected[0], $output, "Testing {$amount} with {$currency} currency and expected {$expected[0]} (without decimal)." );
 
 				// Test 2: with decimal(2)
 				give_update_option( 'number_decimals', 2 );
-				$output = give_format_amount( $amount, array( 'sanitize' => ! is_numeric( $amount ), 'currency' => $currency ) );
+				$output = give_format_amount( $amount, array(
+					'sanitize' => ! is_numeric( $amount ),
+					'currency' => $currency,
+				) );
 				$this->assertSame( $expected[1], $output, "Testing {$amount} with {$currency} currency and expected {$expected[1]} (with decimal {2})." );
 
 				// Test 3: with decimal (more then 2)
 				give_update_option( 'number_decimals', 4 );
-				$output = give_format_amount( $amount, array( 'sanitize' => ! is_numeric( $amount ), 'currency' => $currency ) );
+				$output = give_format_amount( $amount, array(
+					'sanitize' => ! is_numeric( $amount ),
+					'currency' => $currency,
+				) );
 				$this->assertSame( $expected[2], $output, "Testing {$amount} with {$currency} currency and expected {$expected[2]} (with decimal {4})." );
 		}
 	}
@@ -255,52 +270,104 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 	function give_format_amount_provider() {
 		return array(
 			// Not Formatted
-			array( '1000000000000.28735', array( '10,00,00,00,00,000', '10,00,00,00,00,000.29', '10,00,00,00,00,000.2874' ), array( 'INR' ) ),
-			array( '1000000000.8274', array( '1,00,00,00,001', '1,00,00,00,000.83', '1,00,00,00,000.8274' ), array( 'INR' ) ),
-			array( '1000000.98257', array( '10,00,001', '10,00,000.98', '10,00,000.9826'  ), array( 'INR' ) ),
+			array(
+				'1000000000000.28735',
+				array( '10,00,00,00,00,000', '10,00,00,00,00,000.29', '10,00,00,00,00,000.2874' ),
+				array( 'INR' ),
+			),
+			array(
+				'1000000000.8274',
+				array( '1,00,00,00,001', '1,00,00,00,000.83', '1,00,00,00,000.8274' ),
+				array( 'INR' ),
+			),
+			array( '1000000.98257', array( '10,00,001', '10,00,000.98', '10,00,000.9826' ), array( 'INR' ) ),
 			array( '10000.89275', array( '10,001', '10,000.89', '10,000.8928' ), array( 'INR' ) ),
 			array( '100.7325', array( '101', '100.73', '100.7325' ), array( 'INR' ) ),
 			array( '100.3', array( '100', '100.30', '100.3000' ), array( 'INR' ) ),
 			array( '100', array( '100', '100.00', '100.0000' ), array( 'INR' ) ),
-			array( '1000000000000.28735', array( '1,000,000,000,000', '1,000,000,000,000.29', '1,000,000,000,000.2874' ), array( 'USD' ) ),
-			array( '1000000000.8274', array( '1,000,000,001', '1,000,000,000.83', '1,000,000,000.8274' ), array( 'USD' ) ),
-			array( '1000000.98257', array( '1,000,001', '1,000,000.98', '1,000,000.9826'  ), array( 'USD' ) ),
+			array(
+				'1000000000000.28735',
+				array( '1,000,000,000,000', '1,000,000,000,000.29', '1,000,000,000,000.2874' ),
+				array( 'USD' ),
+			),
+			array(
+				'1000000000.8274',
+				array( '1,000,000,001', '1,000,000,000.83', '1,000,000,000.8274' ),
+				array( 'USD' ),
+			),
+			array( '1000000.98257', array( '1,000,001', '1,000,000.98', '1,000,000.9826' ), array( 'USD' ) ),
 			array( '10000.89275', array( '10,001', '10,000.89', '10,000.8928' ), array( 'USD' ) ),
 			array( '100.7325', array( '101', '100.73', '100.7325' ), array( 'USD' ) ),
 			array( '100', array( '100', '100.00', '100.0000' ), array( 'USD' ) ),
 			array( '100.3', array( '100', '100.30', '100.3000' ), array( 'USD' ) ),
-			array( '1000000000000.28735', array( '1.000.000.000.000', '1.000.000.000.000,29', '1.000.000.000.000,2874' ), array( 'EUR', '.', ',' ) ),
-			array( '1000000000.8274', array( '1.000.000.001', '1.000.000.000,83', '1.000.000.000,8274' ),  array( 'EUR', '.', ',' ) ),
-			array( '1000000.98257', array( '1.000.001', '1.000.000,98', '1.000.000,9826'  ),  array( 'EUR', '.', ',' ) ),
-			array( '10000.89275', array( '10.001', '10.000,89', '10.000,8928' ),  array( 'EUR', '.', ',' ) ),
-			array( '100.7325', array( '101', '100,73', '100,7325' ),  array( 'EUR', '.', ',' ) ),
-			array( '100', array( '100', '100,00', '100,0000' ),  array( 'EUR', '.', ',' ) ),
-			array( '100.3', array( '100', '100,30', '100,3000' ),  array( 'EUR', '.', ',' ) ),
+			array(
+				'1000000000000.28735',
+				array( '1.000.000.000.000', '1.000.000.000.000,29', '1.000.000.000.000,2874' ),
+				array( 'EUR', '.', ',' ),
+			),
+			array(
+				'1000000000.8274',
+				array( '1.000.000.001', '1.000.000.000,83', '1.000.000.000,8274' ),
+				array( 'EUR', '.', ',' ),
+			),
+			array( '1000000.98257', array( '1.000.001', '1.000.000,98', '1.000.000,9826' ), array( 'EUR', '.', ',' ) ),
+			array( '10000.89275', array( '10.001', '10.000,89', '10.000,8928' ), array( 'EUR', '.', ',' ) ),
+			array( '100.7325', array( '101', '100,73', '100,7325' ), array( 'EUR', '.', ',' ) ),
+			array( '100', array( '100', '100,00', '100,0000' ), array( 'EUR', '.', ',' ) ),
+			array( '100.3', array( '100', '100,30', '100,3000' ), array( 'EUR', '.', ',' ) ),
 
 			// Formatted
-			array( '10,00,00,00,00,000.28735', array( '10,00,00,00,00,000', '10,00,00,00,00,000.29', '10,00,00,00,00,000.2874' ), array( 'INR' ) ),
-			array( '1,00,00,00,000.8274', array( '1,00,00,00,001', '1,00,00,00,000.83', '1,00,00,00,000.8274' ), array( 'INR' ) ),
-			array( '10,00,000.98257', array( '10,00,001', '10,00,000.98', '10,00,000.9826'  ), array( 'INR' ) ),
+			array(
+				'10,00,00,00,00,000.28735',
+				array( '10,00,00,00,00,000', '10,00,00,00,00,000.29', '10,00,00,00,00,000.2874' ),
+				array( 'INR' ),
+			),
+			array(
+				'1,00,00,00,000.8274',
+				array( '1,00,00,00,001', '1,00,00,00,000.83', '1,00,00,00,000.8274' ),
+				array( 'INR' ),
+			),
+			array( '10,00,000.98257', array( '10,00,001', '10,00,000.98', '10,00,000.9826' ), array( 'INR' ) ),
 			array( '10,000.89275', array( '10,001', '10,000.89', '10,000.8928' ), array( 'INR' ) ),
 			array( '100.7325', array( '101', '100.73', '100.7325' ), array( 'INR' ) ),
 			array( '100.3', array( '100', '100.30', '100.3000' ), array( 'INR' ) ),
 			array( '100', array( '100', '100.00', '100.0000' ), array( 'INR' ) ),
-			array( '1,000,000,000,000.28735', array( '1,000,000,000,000', '1,000,000,000,000.29', '1,000,000,000,000.2874' ), array( 'USD' ) ),
-			array( '1,000,000,000.8274', array( '1,000,000,001', '1,000,000,000.83', '1,000,000,000.8274' ), array( 'USD' ) ),
-			array( '1,000,000.98257', array( '1,000,001', '1,000,000.98', '1,000,000.9826'  ), array( 'USD' ) ),
+			array(
+				'1,000,000,000,000.28735',
+				array( '1,000,000,000,000', '1,000,000,000,000.29', '1,000,000,000,000.2874' ),
+				array( 'USD' ),
+			),
+			array(
+				'1,000,000,000.8274',
+				array( '1,000,000,001', '1,000,000,000.83', '1,000,000,000.8274' ),
+				array( 'USD' ),
+			),
+			array( '1,000,000.98257', array( '1,000,001', '1,000,000.98', '1,000,000.9826' ), array( 'USD' ) ),
 			array( '10,000.89275', array( '10,001', '10,000.89', '10,000.8928' ), array( 'USD' ) ),
 			array( '100.7325', array( '101', '100.73', '100.7325' ), array( 'USD' ) ),
 			array( '100', array( '100', '100.00', '100.0000' ), array( 'USD' ) ),
 			array( '100.3', array( '100', '100.30', '100.3000' ), array( 'USD' ) ),
-			array( '1.000.000.000.000,28735', array( '1.000.000.000.000', '1.000.000.000.000,29', '1.000.000.000.000,2874' ), array( 'EUR', '.', ',' ) ),
-			array( '1.000.000.000,8274', array( '1.000.000.001', '1.000.000.000,83', '1.000.000.000,8274' ),  array( 'EUR', '.', ',' ) ),
-			array( '1.000.000,98257', array( '1.000.001', '1.000.000,98', '1.000.000,9826'  ),  array( 'EUR', '.', ',' ) ),
-			array( '10.000,89275', array( '10.001', '10.000,89', '10.000,8928' ),  array( 'EUR', '.', ',' ) ),
-			array( '1.000,89275', array( '1.001', '1.000,89', '1.000,8928' ),  array( 'EUR', '.', ',' ) ),
-			array( '1.000,89', array( '1.001', '1.000,89', '1.000,8900' ),  array( 'EUR', '.', ',' ) ),
-			array( '100,7325', array( '101', '100,73', '100,7325' ),  array( 'EUR', '.', ',' ) ),
-			array( '100', array( '100', '100,00', '100,0000' ),  array( 'EUR', '.', ',' ) ),
-			array( '100,3', array( '100', '100,30', '100,3000' ),  array( 'EUR', '.', ',' ) ),
+			array(
+				'1.000.000.000.000,28735',
+				array( '1.000.000.000.000', '1.000.000.000.000,29', '1.000.000.000.000,2874' ),
+				array( 'EUR', '.', ',' ),
+			),
+			array(
+				'1.000.000.000,8274',
+				array( '1.000.000.001', '1.000.000.000,83', '1.000.000.000,8274' ),
+				array( 'EUR', '.', ',' ),
+			),
+			array(
+				'1.000.000,98257',
+				array( '1.000.001', '1.000.000,98', '1.000.000,9826' ),
+				array( 'EUR', '.', ',' ),
+			),
+			array( '10.000,89275', array( '10.001', '10.000,89', '10.000,8928' ), array( 'EUR', '.', ',' ) ),
+			array( '1.000,89275', array( '1.001', '1.000,89', '1.000,8928' ), array( 'EUR', '.', ',' ) ),
+			array( '1.000,89', array( '1.001', '1.000,89', '1.000,8900' ), array( 'EUR', '.', ',' ) ),
+			array( '100,7325', array( '101', '100,73', '100,7325' ), array( 'EUR', '.', ',' ) ),
+			array( '100', array( '100', '100,00', '100,0000' ), array( 'EUR', '.', ',' ) ),
+			array( '100,3', array( '100', '100,30', '100,3000' ), array( 'EUR', '.', ',' ) ),
 		);
 	}
 
@@ -318,14 +385,20 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 	 */
 	function test_give_human_format_large_amount( $amount, $expected ) {
 		// Case 1.
-		$output = give_human_format_large_amount( give_format_amount( $amount, array( 'sanitize' => false, 'currency' => 'USD' ) ) );
+		$output = give_human_format_large_amount( give_format_amount( $amount, array(
+			'sanitize' => false,
+			'currency' => 'USD',
+		) ) );
 		$this->assertSame(
 			$expected[0],
 			$output
 		);
 
 		// Case 2.
-		$output = give_human_format_large_amount( give_format_amount( $amount, array( 'sanitize' => false, 'currency' => 'INR' ) ), array( 'currency' => 'INR' ) );
+		$output = give_human_format_large_amount( give_format_amount( $amount, array(
+			'sanitize' => false,
+			'currency' => 'INR',
+		) ), array( 'currency' => 'INR' ) );
 		$this->assertSame(
 			$expected[1],
 			$output
@@ -345,11 +418,13 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 			array( '1234000000000', array( '1.23 trillion', '1234 arab' ) ),
 			array( '1000000000000', array( '1 trillion', '1000 arab' ) ),
 			array( '1000000000', array( '1 billion', '1 arab' ) ),
-			array( '1000000', array( '1 million', '10 lakh') ),
-			array( '100000', array( '100,000.00', '1 lakh') ),
-			array( '599000', array( '599,000.00', '5.99 lakh') ),
+			array( '1000000', array( '1 million', '10 lakh' ) ),
+			array( '100000', array( '100,000.00', '1 lakh' ) ),
+			array( '599000', array( '599,000.00', '5.99 lakh' ) ),
 			array( '10000', array( '10,000.00', '10,000.00' ) ),
 			array( '100', array( '100.00', '100.00' ) ),
+			array( '0', array( '0', '0' ) ),
+			array( '0.000', array( '0', '0' ) ),
 		);
 	}
 
@@ -358,8 +433,8 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 	 *
 	 * @since        1.8
 	 *
-	 * @param int $number
-	 * @param string $expected
+	 * @param int      $number
+	 * @param string   $expected
 	 * @param int|bool $decimal_place
 	 *
 	 * @cover        give_format_decimal
@@ -411,11 +486,12 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 		give_update_option( 'currency', $currency );
 		give_update_option( 'currency_position', $currency_position );
 
-		$output = give_currency_filter( $price, $currency, $decode_currency );
+		$output = give_currency_filter( $price, array( 'currency_code' => $currency, 'decode_currency' => $decode_currency ) );
 
 		$this->assertSame(
 			$expected,
-			$output
+			// Compare decoded currency by encoding them.
+			$decode_currency ? htmlentities( $output, ENT_COMPAT, 'UTF-8' ) : $output
 		);
 	}
 
@@ -433,13 +509,15 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 			array( '10', 'USD', 'before', false, '&#36;10' ),
 			array( '10', 'ZAR', 'before', false, '&#82;10' ),
 			array( '10', 'NOK', 'before', false, '&#107;&#114;. 10' ),
+			array( '10', 'IRR', 'before', false, '&#x202B;10&#xfdfc;&#x202C;' ),
+			array( '10', 'IRR', 'after', false, '&#x202A;10&#xfdfc;&#x202C;' ),
 
 			array( '10', 'USD', 'after', true, '10$' ),
 			array( '10', 'ZAR', 'after', true, '10R' ),
 			array( '10', 'NOK', 'after', true, '10 kr.' ),
 			array( '10', 'USD', 'before', true, '$10' ),
 			array( '10', 'ZAR', 'before', true, 'R10' ),
-			array( '10', 'NOK', 'before', true, 'kr. 10' ),
+			array( '10', 'NOK', 'before', true, 'kr. 10' )
 		);
 	}
 
@@ -491,7 +569,7 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 		 *
 		 * Change currency
 		 */
-		give_update_option( 'currency', 'RIAL' );
+		give_update_option( 'currency', 'IRR' );
 
 		// Get updated number of decimal
 		$output_number_of_decimal = give_get_price_decimals();
@@ -581,7 +659,7 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 		// Basic query param.
 		$input_query_args = array(
 			'post_parent'    => 1024,
-			'post_type'      => 'give_log',
+			'post_type'      => 'give_payment',
 			'posts_per_page' => - 1,
 			'post_status'    => 'publish',
 			'fields'         => 'ids',
@@ -589,7 +667,7 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 
 		$output = Give_Cache::get_key( $input_action, $input_query_args );
 
-		$this->assertEquals( 'give_cache_get_log_count_01f5c4012ed8142', $output );
+		$this->assertEquals( 'give_cache_get_log_count_0c601bd4ca75279', $output );
 	}
 
 	/**
@@ -643,19 +721,60 @@ class Tests_Formatting extends Give_Unit_Test_Case {
 	}
 
 	/**
-	 * Test give_validate_nonce function
 	 *
-	 * @since  1.8
+	 * Test give_check_variable function.
 	 *
-	 * @cover  give_validate_nonce
+	 * @since        2.0
+	 *
+	 * @param mixed  $expected
+	 * @param mixed  $variable
+	 * @param string $conditional
+	 * @param mixed  $default
+	 * @param string $array_key_name
+	 *
+	 * @cover        give_check_variable
+	 * @dataProvider give_check_variable_provider
 	 */
-	// function test_give_validate_nonce() {
-	// 	$input_nonce = wp_create_nonce( 'give_gateway' );
-	//
-	// 	/*
-	// 	 * If nonce does not validate successfully then WPDieException throw.
-	// 	 */
-	// 	$this->expectException( 'WPDieException' );
-	// 	give_validate_nonce( $input_nonce );
-	// }
+	public function test_give_check_variable( $expected, $variable, $conditional = '', $default = false, $array_key_name = '' ) {
+
+		$variable = give_check_variable( $variable, $conditional, $default, $array_key_name );
+
+		$this->assertSame( $expected, $variable );
+	}
+
+
+	/**
+	 * Data provider for give_check_variable function.
+	 *
+	 * @since 2.0
+	 *
+	 * @return array
+	 */
+	public function give_check_variable_provider() {
+		return array(
+			// Variable.
+			array( true, null, 'isset', true ),
+			array( false, false, 'isset', true ),
+			array( true, '', 'empty', true ),
+			array( 1, 0, 'empty', 1 ),
+			array( true, null, 'isset_empty', true ),
+			array( true, '', 'isset_empty', true ),
+			array( true, null, 'null', true ),
+			array( true, true, 'null', false ),
+
+			// Array.
+			array( false, array(), 'isset', false, 'payment_id' ),
+			array( 2347, array( 'payment_id' => 2347 ), 'isset', true, 'payment_id' ),
+			array( true, array( 'payment_id' => null ), 'isset', true, 'payment_id' ),
+			array( true, array( 'payment_id' => true ), 'isset', false, 'payment_id' ),
+			array( true, array( 'payment_id' => '' ), 'empty', true, 'payment_id' ),
+			array( 2347, array( 'payment_id' => 2347 ), 'empty', true, 'payment_id' ),
+			array( 0, array( 'payment_id' => '' ), 'isset_empty', 0, 'payment_id' ),
+			array( 2347, array( 'payment_id' => 2347 ), 'isset_empty', 0, 'payment_id' ),
+			array( 0, array( 'payment_id' => null ), 'isset_empty', 0, 'payment_id' ),
+			array( 0, array(), 'isset_empty', 0, 'payment_id' ),
+			array( 0, array( 'payment_id' => null ), 'null', 0, 'payment_id' ),
+			array( 2347, array( 'payment_id' => 2347 ), 'null', 0, 'payment_id' ),
+		);
+	}
 }

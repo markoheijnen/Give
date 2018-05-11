@@ -169,3 +169,93 @@ function give_akismet_spam_check( $args ) {
 	// Allow developer to modified Akismet spam detection response.
 	return apply_filters( 'give_akismet_spam_check', $spam, $args );
 }
+
+/**
+ * Add support of RIAL code for backward compatibility.
+ * Note: for internal use only
+ *
+ * @since 1.8.17
+ *
+ * @param array $currencies
+ *
+ * @return array
+ */
+function give_bc_v1817_iranian_currency_code( $currencies ) {
+	if ( ! give_has_upgrade_completed( 'v1817_update_donation_iranian_currency_code' ) ) {
+		$currencies['RIAL'] = $currencies['IRR'];
+	}
+
+	return $currencies;
+}
+
+add_filter( 'give_currencies', 'give_bc_v1817_iranian_currency_code', 0 );
+
+
+/**
+ * Format right to left supported currency amount.
+ *
+ * @since 1.8.17
+ *
+ * @param $formatted_amount
+ * @param $currency_args
+ * @param $price
+ *
+ * @return string
+ */
+function give_format_price_for_right_to_left_supported_currency( $formatted_amount, $currency_args, $price ) {
+	if ( ! give_is_right_to_left_supported_currency( $currency_args['currency_code'] ) ) {
+		return $formatted_amount;
+	}
+
+	$formatted_amount = (
+	'before' === (string) $currency_args['position'] ?
+		'&#x202B;' . $price . $currency_args['symbol'] . '&#x202C;' :
+		'&#x202A;' . $price . $currency_args['symbol'] . '&#x202C;'
+	);
+
+	$formatted_amount = $currency_args['decode_currency'] ?
+		html_entity_decode( $formatted_amount, ENT_COMPAT, 'UTF-8' ) :
+		$formatted_amount;
+
+	return $formatted_amount;
+}
+
+add_filter( 'give_currency_filter', 'give_format_price_for_right_to_left_supported_currency', 10, 3 );
+
+/**
+ * Validate active gateway value before returning result.
+ *
+ * @since 2.1.0
+ *
+ * @param $value
+ *
+ * @return array
+ */
+function __give_validate_active_gateways( $value ) {
+	$gateways = array_keys( give_get_payment_gateways() );
+	$active_gateways = is_array( $value ) ? array_keys( $value ) : array();
+
+	// Remove deactivated payment gateways.
+	if( ! empty( $active_gateways ) ) {
+		foreach ( $active_gateways as $index => $gateway_id ) {
+			if( ! in_array( $gateway_id, $gateways ) ) {
+				unset( $value[$gateway_id] );
+			}
+		}
+	}
+
+	if ( empty( $value ) ) {
+		/**
+		 * Filter the default active gateway
+		 *
+		 * @since 2.1.0
+		 */
+		$value = apply_filters( 'give_default_active_gateways', array(
+			'manual' => 1,
+		) );
+	}
+
+	return $value;
+}
+
+add_filter( 'give_get_option_gateways', '__give_validate_active_gateways', 10, 1 );

@@ -54,9 +54,11 @@ do_action( 'give_tools_recount_stats_before' );
 					<span class="tools-form-dropdown tools-form-dropdown-recount-form" style="display: none">
 						<?php
 						$args = array(
-							'name'   => 'form_id',
-							'number' => - 1,
-							'chosen' => true,
+							'class'       => 'tools-form-dropdown-recount-form-select',
+							'name'        => 'form_id',
+							'number'      => - 1,
+							'chosen'      => true,
+							'placeholder' => __( 'Select Form', 'give' ),
 						);
 						echo Give()->html->forms_dropdown( $args );
 						?>
@@ -65,10 +67,8 @@ do_action( 'give_tools_recount_stats_before' );
 					<span class="tools-form-dropdown tools-form-dropdown-delete-import-donors" style="display: none">
 						<label for="delete-import-donors">
 							<?php
-							echo Give()->html->checkbox( array(
-								'name'    => 'delete-import-donors'
-							) );
-							_e( 'Delete imported WordPress users', 'give' );
+							echo Give()->html->checkbox( array( 'name' => 'delete-import-donors' ) );
+							esc_html_e( 'Delete imported WordPress users', 'give' );
 							?>
 						</label>
 					</span>
@@ -92,8 +92,8 @@ do_action( 'give_tools_recount_stats_before' );
 						 */
 						do_action( 'give_recount_tool_descriptions' );
 						?>
-						<span id="delete-test-transactions"><?php _e( '<strong>Deletes</strong> all TEST donations, donors, and related log entries.', 'give' ); ?></span>
-						<span id="reset-stats"><?php _e( '<strong>Deletes</strong> ALL donations, donors, and related log entries regardless of test or live mode.', 'give' ); ?></span>
+						<span id="delete-test-transactions"><strong><?php esc_html_e( 'Deletes', 'give' ); ?></strong> <?php esc_html_e( 'all TEST donations, donors, and related log entries.', 'give' ); ?></span>
+						<span id="reset-stats"><strong><?php esc_html_e( 'Deletes', 'give' ); ?></strong> <?php esc_html_e( 'ALL donations, donors, and related log entries regardless of test or live mode.', 'give' ); ?></span>
 					</span>
 
 					<span class="spinner"></span>
