@@ -51,6 +51,15 @@ class Give_Tools_Recount_Form_Stats extends Give_Batch_Export {
 	protected $form_id = null;
 
 	/**
+	 * Constructor.
+	 */
+	public function __construct( $_step = 1 ) {
+		parent::__construct( $_step );
+
+		$this->is_writable = true;
+	}
+
+	/**
 	 * Get the Export Data
 	 *
 	 * @access public
@@ -59,6 +68,7 @@ class Give_Tools_Recount_Form_Stats extends Give_Batch_Export {
 	 * @return bool
 	 */
 	public function get_data() {
+
 		$accepted_statuses = apply_filters( 'give_recount_accepted_statuses', array( 'publish' ) );
 
 		if ( $this->step == 1 ) {
@@ -88,18 +98,32 @@ class Give_Tools_Recount_Form_Stats extends Give_Batch_Export {
 
 		if ( $payments ) {
 			foreach ( $payments as $payment ) {
-				//Ensure acceptible status only
+
+				// Ensure acceptable status only.
 				if ( ! in_array( $payment->post_status, $accepted_statuses ) ) {
 					continue;
 				}
 
-				//Ensure only payments for this form are counted
+				// Ensure only payments for this form are counted.
 				if ( $payment->form_id != $this->form_id ) {
 					continue;
 				}
 
+				/**
+				 * Filter the payment amount.
+				 *
+				 * @since 2.1
+				 */
+				$earning_amount = apply_filters(
+					'give_donation_amount',
+					give_format_amount( $payment->total, array( 'donation_id' => $payment->ID ) ),
+					$payment->total,
+					$payment->ID,
+					array( 'type' => 'stats', 'currency' => false, 'amount' => false )
+				);
+
 				$totals['sales'] ++;
-				$totals['earnings'] += $payment->total;
+				$totals['earnings'] += (float) give_maybe_sanitize_amount( $earning_amount );
 
 			}
 
@@ -197,11 +221,7 @@ class Give_Tools_Recount_Form_Stats extends Give_Batch_Export {
 	}
 
 	public function headers() {
-		ignore_user_abort( true );
-
-		if ( ! give_is_func_disabled( 'set_time_limit' ) && ! ini_get( 'safe_mode' ) ) {
-			set_time_limit( 0 );
-		}
+		give_ignore_user_abort();
 	}
 
 	/**

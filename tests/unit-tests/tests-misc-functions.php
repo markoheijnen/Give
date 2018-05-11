@@ -31,9 +31,7 @@ class Tests_MISC_Functions extends Give_Unit_Test_Case {
 
 
 	/**
-	 * Data Provider
-	 *
-	 * @todo  Add more currencies for testing.
+	 * Data Provider.
 	 *
 	 * @since 1.8.8
 	 * @return array
@@ -41,8 +39,35 @@ class Tests_MISC_Functions extends Give_Unit_Test_Case {
 	public function give_get_currency_name_data_provider() {
 		return array(
 			array( give_get_currency_name( 'USD' ), __( 'US Dollars', 'give' ) ),
+			array( give_get_currency_name( 'EUR' ), __( 'Euros', 'give' ) ),
 			array( give_get_currency_name( 'GBP' ), __( 'Pounds Sterling', 'give' ) ),
+			array( give_get_currency_name( 'AUD' ), __( 'Australian Dollars', 'give' ) ),
+			array( give_get_currency_name( 'BRL' ), __( 'Brazilian Real', 'give' ) ),
+			array( give_get_currency_name( 'CAD' ), __( 'Canadian Dollars', 'give' ) ),
+			array( give_get_currency_name( 'CZK' ), __( 'Czech Koruna', 'give' ) ),
+			array( give_get_currency_name( 'DKK' ), __( 'Danish Krone', 'give' ) ),
+			array( give_get_currency_name( 'HKD' ), __( 'Hong Kong Dollar', 'give' ) ),
+			array( give_get_currency_name( 'HUF' ), __( 'Hungarian Forint', 'give' ) ),
+			array( give_get_currency_name( 'ILS' ), __( 'Israeli Shekel', 'give' ) ),
+			array( give_get_currency_name( 'JPY' ), __( 'Japanese Yen', 'give' ) ),
+			array( give_get_currency_name( 'MYR' ), __( 'Malaysian Ringgits', 'give' ) ),
+			array( give_get_currency_name( 'MXN' ), __( 'Mexican Peso', 'give' ) ),
+			array( give_get_currency_name( 'MAD' ), __( 'Moroccan Dirham', 'give' ) ),
+			array( give_get_currency_name( 'NZD' ), __( 'New Zealand Dollar', 'give' ) ),
+			array( give_get_currency_name( 'NOK' ), __( 'Norwegian Krone', 'give' ) ),
+			array( give_get_currency_name( 'PHP' ), __( 'Philippine Pesos', 'give' ) ),
+			array( give_get_currency_name( 'PLN' ), __( 'Polish Zloty', 'give' ) ),
+			array( give_get_currency_name( 'SGD' ), __( 'Singapore Dollar', 'give' ) ),
+			array( give_get_currency_name( 'KRW' ), __( 'South Korean Won', 'give' ) ),
+			array( give_get_currency_name( 'ZAR' ), __( 'South African Rand', 'give' ) ),
+			array( give_get_currency_name( 'SEK' ), __( 'Swedish Krona', 'give' ) ),
+			array( give_get_currency_name( 'CHF' ), __( 'Swiss Franc', 'give' ) ),
 			array( give_get_currency_name( 'TWD' ), __( 'Taiwan New Dollars', 'give' ) ),
+			array( give_get_currency_name( 'THB' ), __( 'Thai Baht', 'give' ) ),
+			array( give_get_currency_name( 'INR' ), __( 'Indian Rupee', 'give' ) ),
+			array( give_get_currency_name( 'TRY' ), __( 'Turkish Lira', 'give' ) ),
+			array( give_get_currency_name( 'IRR' ), __( 'Iranian Rial', 'give' ) ),
+			array( give_get_currency_name( 'RUB' ), __( 'Russian Rubles', 'give' ) ),
 			array( give_get_currency_name( 'Wrong_Currency_Symbol' ), '' ),
 		);
 	}
@@ -53,30 +78,46 @@ class Tests_MISC_Functions extends Give_Unit_Test_Case {
 	 * @since         1.8.8
 	 * @access        public
 	 *
+	 * @param int $form_or_donation_id
+	 *
 	 * @cover         give_get_meta
 	 * @cover         give_update_meta
 	 * @cover         give_delete_meta
+	 *
+	 * @dataProvider  give_meta_helpers_provider
 	 */
-	public function test_give_meta_helpers() {
-		$payment = Give_Helper_Payment::create_simple_payment();
-
-		$value = give_get_meta( $payment, 'testing_meta', true, 'TEST1' );
+	public function test_give_meta_helpers( $form_or_donation_id ) {
+		$value = give_get_meta( $form_or_donation_id, 'testing_meta', true, 'TEST1' );
 		$this->assertEquals( 'TEST1', $value );
 
-		$status = give_update_meta( $payment, 'testing_meta', 'TEST' );
+		$status = give_update_meta( $form_or_donation_id, 'testing_meta', 'TEST' );
 		$this->assertEquals( true, (bool) $status );
 
-		$status = give_update_meta( $payment, 'testing_meta', 'TEST' );
+		$status = give_update_meta( $form_or_donation_id, 'testing_meta', 'TEST' );
 		$this->assertEquals( false, (bool) $status );
 
-		$value = give_get_meta( $payment, 'testing_meta', true );
+		$value = give_get_meta( $form_or_donation_id, 'testing_meta', true );
 		$this->assertEquals( 'TEST', $value );
 
-		$status = give_delete_meta( $payment, 'testing_meta', 'TEST2' );
+		$status = give_delete_meta( $form_or_donation_id, 'testing_meta', 'TEST2' );
 		$this->assertEquals( false, $status );
 
-		$status = give_delete_meta( $payment, 'testing_meta' );
+		$status = give_delete_meta( $form_or_donation_id, 'testing_meta' );
 		$this->assertEquals( true, $status );
+	}
+	
+	
+	/**
+	 * Data provider for test_give_meta_helpers
+	 *
+	 * @since 2.0
+	 * @access private
+	 */
+	public function give_meta_helpers_provider(){
+		return array(
+			array( Give_Helper_Payment::create_simple_payment() ),
+			array( Give_Helper_Form::create_simple_form()->id ),
+		);
 	}
 
 	/**
@@ -101,7 +142,7 @@ class Tests_MISC_Functions extends Give_Unit_Test_Case {
 
 		// Simple Donation Form using Payment Gateway Item Title with Custom Amount.
 		$title = give_payment_gateway_item_title( $donation );
-		$this->assertEquals( 'Test Donation Form - Would you like to set a custom amount?', $title );
+		$this->assertEquals( 'Test Donation Form', $title );
 
 		// Setup MultiLevel Donation Form.
 		$donation = Give_Helper_Form::setup_multi_level_donation_form();
@@ -115,7 +156,48 @@ class Tests_MISC_Functions extends Give_Unit_Test_Case {
 
 		// MultiLevel Donation Form using Payment Gateway Item Title with Custom Amount.
 		$title = give_payment_gateway_item_title( $donation );
-		$this->assertEquals( 'Test Donation Form - Custom Amount', $title );
+		$this->assertEquals( 'Test Donation Form', $title );
 
+	}
+
+	/**
+	 * Check if current page/url is give's admin page or not.
+	 *
+	 * @since  2.1
+	 * @access public
+	 *
+	 * @cover give_is_admin_page
+	 */
+	public function test_give_is_admin_page() {
+		require_once GIVE_PLUGIN_DIR . 'includes/admin/admin-pages.php';
+
+		$GLOBALS['typenow'] = 'give_forms';
+		$GLOBALS['pagenow'] = 'edit.php';
+
+		// Donation form page, it should return true.
+		$this->go_to( admin_url( 'edit.php?post_type=give_forms' ) );
+		$this->assertTrue( give_is_admin_page() );
+
+		// Setting pages.
+		$this->go_to( admin_url( 'edit.php?post_type=give_forms&page=give-settings&tab=gateways' ) );
+		$this->assertTrue( give_is_admin_page() );
+
+		// Taxonomies page.
+		$GLOBALS['pagenow'] = 'edit-tags.php';
+
+		$this->go_to( admin_url( 'edit-tags.php?taxonomy=give_forms_category&post_type=give_forms' ) );
+		$this->assertTrue( give_is_admin_page() );
+
+		// Non-Give pages will not have this variable so, Unset.
+		unset( $GLOBALS['typenow'] );
+
+		// WP Plugin page.
+		$GLOBALS['pagenow'] = 'plugins.php';
+		$this->assertFalse( give_is_admin_page() ); // False.
+		$this->assertFalse( give_is_admin_page( 'give_forms' ) ); // False.
+
+		// Admin-ajax.
+		$GLOBALS['pagenow'] = 'admin-ajax.php';
+		$this->assertFalse( give_is_admin_page() );
 	}
 }

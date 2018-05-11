@@ -117,12 +117,22 @@ class Give_HTML_Elements {
 
 		$args = wp_parse_args( $args, $defaults );
 
-		$forms = get_posts( array(
+		$form_args = array(
 			'post_type'      => 'give_forms',
 			'orderby'        => 'title',
 			'order'          => 'ASC',
 			'posts_per_page' => $args['number'],
-		) );
+		);
+
+		$cache_key   = Give_Cache::get_key( 'give_forms', $form_args, false );
+
+		// Get forms from cache.
+		$forms = Give_Cache::get_db_query( $cache_key );
+
+		if ( is_null( $forms ) ) {
+			$forms = get_posts( $form_args );
+			Give_Cache::set_db_query( $cache_key, $forms );
+		}
 
 		$options = array();
 
@@ -242,15 +252,16 @@ class Give_HTML_Elements {
 	 * @since  1.0
 	 * @access public
 	 *
-	 * @param  string $name     Name attribute of the dropdown. Default is 'give_forms_categories'.
-	 * @param  int    $selected Category to select automatically. Default is 0.
-	 * @param  array  $args     Select box options.
+	 * @param  string $name Name attribute of the dropdown. Default is 'give_forms_categories'.
+	 * @param  int $selected Category to select automatically. Default is 0.
+	 * @param  array $args Select box options.
 	 *
 	 * @return string           Categories dropdown.
 	 */
 	public function category_dropdown( $name = 'give_forms_categories', $selected = 0, $args = array() ) {
 		$categories = get_terms( 'give_forms_category', apply_filters( 'give_forms_category_dropdown', array() ) );
-		$options    = array();
+
+		$options = array();
 
 		foreach ( $categories as $category ) {
 			$options[ absint( $category->term_id ) ] = esc_html( $category->name );
@@ -275,14 +286,15 @@ class Give_HTML_Elements {
 	 * @since  1.8
 	 * @access public
 	 *
-	 * @param  string $name     Name attribute of the dropdown. Default is 'give_forms_tags'.
-	 * @param  int    $selected Tag to select automatically. Default is 0.
-	 * @param  array  $args     Select box options.
+	 * @param  string $name Name attribute of the dropdown. Default is 'give_forms_tags'.
+	 * @param  int $selected Tag to select automatically. Default is 0.
+	 * @param  array $args Select box options.
 	 *
 	 * @return string           Tags dropdown.
 	 */
 	public function tags_dropdown( $name = 'give_forms_tags', $selected = 0, $args = array() ) {
 		$tags    = get_terms( 'give_forms_tag', apply_filters( 'give_forms_tag_dropdown', array() ) );
+
 		$options = array();
 
 		foreach ( $tags as $tag ) {
@@ -409,23 +421,30 @@ class Give_HTML_Elements {
 			$data_elements .= ' data-' . esc_attr( $key ) . '="' . esc_attr( $value ) . '"';
 		}
 
+		$multiple = '';
 		if ( $args['multiple'] ) {
-			$multiple = ' MULTIPLE';
-		} else {
-			$multiple = '';
+			$multiple = 'MULTIPLE';
 		}
 
 		if ( $args['chosen'] ) {
 			$args['class'] .= ' give-select-chosen';
 		}
 
+		$placeholder = '';
 		if ( $args['placeholder'] ) {
 			$placeholder = $args['placeholder'];
-		} else {
-			$placeholder = '';
 		}
 
-		$output = '<select name="' . esc_attr( $args['name'] ) . '" id="' . esc_attr( sanitize_key( str_replace( '-', '_', $args['id'] ) ) ) . '" class="give-select ' . esc_attr( $args['class'] ) . '"' . $multiple . ' ' . $args['select_atts'] . ' data-placeholder="' . $placeholder . '"' . $data_elements . '>';
+		$output = sprintf(
+			'<select name="%1$s" id="%2$s" class="give-select %3$s" %4$s %5$s placeholder="%6$s" data-placeholder="%6$s" %7$s>',
+			esc_attr( $args['name'] ),
+			esc_attr( sanitize_key( str_replace( '-', '_', $args['id'] ) ) ),
+			esc_attr( $args['class'] ),
+			$multiple,
+			$args['select_atts'],
+			$placeholder,
+			$data_elements
+		);
 
 		if ( $args['show_option_all'] ) {
 			if ( $args['multiple'] ) {

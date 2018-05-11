@@ -51,7 +51,7 @@ class Give_Donors_Query {
 	 * @since  1.8.14
 	 * @access public
 	 *
-	 * @var    array
+	 * @var    string
 	 */
 	public $table_name = '';
 
@@ -61,7 +61,7 @@ class Give_Donors_Query {
 	 * @since  1.8.14
 	 * @access public
 	 *
-	 * @var    array
+	 * @var    string
 	 */
 	public $meta_table_name = '';
 
@@ -71,14 +71,15 @@ class Give_Donors_Query {
 	 * @since  1.8.14
 	 * @access public
 	 *
-	 * @var    array
+	 * @var    string
 	 */
 	public $meta_type = '';
 
 	/**
 	 * Default query arguments.
 	 *
-	 * Not all of these are valid arguments that can be passed to WP_Query. The ones that are not, are modified before the query is run to convert them to the proper syntax.
+	 * Not all of these are valid arguments that can be passed to WP_Query. The ones that are not, are modified before
+	 * the query is run to convert them to the proper syntax.
 	 *
 	 * @since  1.8.14
 	 * @access public
@@ -104,7 +105,6 @@ class Give_Donors_Query {
 		);
 
 		$this->args = wp_parse_args( $args, $defaults );
-
 		$this->table_name      = Give()->donors->table_name;
 		$this->meta_table_name = Give()->donor_meta->table_name;
 		$this->meta_type       = Give()->donor_meta->meta_type;
@@ -148,11 +148,21 @@ class Give_Donors_Query {
 		 */
 		do_action( 'give_pre_get_donors', $this );
 
-		if ( empty( $this->args['count'] ) ) {
-			$this->donors = $wpdb->get_results( $this->get_sql() );
-		} else {
-			$this->donors = $wpdb->get_var( $this->get_sql() );
+		$cache_key        = Give_Cache::get_key( 'give_donor', $this->get_sql(), false );
+
+		// Get donors from cache.
+		$this->donors = Give_Cache::get_db_query( $cache_key );
+
+		if ( is_null( $this->donors  ) ) {
+			if ( empty( $this->args['count'] ) ) {
+				$this->donors = $wpdb->get_results( $this->get_sql() );
+			} else {
+				$this->donors = $wpdb->get_var( $this->get_sql() );
+			}
+
+			Give_Cache::set_db_query( $cache_key, $this->donors );
 		}
+
 
 		/**
 		 * Fires after retrieving donors.
@@ -179,7 +189,7 @@ class Give_Donors_Query {
 		global $wpdb;
 
 		if ( $this->args['number'] < 1 ) {
-			$this->args['number'] = 999999999999;
+			$this->args['number'] = 99999999999;
 		}
 
 		$where = $this->get_where_query();
@@ -195,7 +205,7 @@ class Give_Donors_Query {
 		if ( ! empty( $this->args['fields'] ) && 'all' !== $this->args['fields'] ) {
 			if ( is_string( $this->args['fields'] ) ) {
 				$fields = "{$this->table_name}.{$this->args['fields']}";
-			} else if ( is_array( $this->args['fields'] ) ) {
+			} elseif ( is_array( $this->args['fields'] ) ) {
 				$fields = "{$this->table_name}." . implode( " , {$this->table_name}.", $this->args['fields'] );
 			}
 		}
@@ -207,11 +217,17 @@ class Give_Donors_Query {
 
 		$orderby = $this->get_order_query();
 
-		return $wpdb->prepare(
-			"SELECT {$fields} FROM {$this->table_name} {$where} {$orderby} {$this->args['order']} LIMIT %d,%d;",
+		$sql = $wpdb->prepare(
+			"SELECT {$fields} FROM {$this->table_name} LIMIT %d,%d;",
 			absint( $this->args['offset'] ),
 			absint( $this->args['number'] )
 		);
+
+		// $where, $orderby and order already prepared query they can generate notice if you re prepare them in above.
+		// WordPress consider LIKE condition as placeholder if start with s,f, or d.
+		$sql = str_replace( 'LIMIT', "{$where} {$orderby} {$this->args['order']} LIMIT", $sql );
+
+		return $sql;
 	}
 
 	/**
@@ -234,17 +250,19 @@ class Give_Donors_Query {
 				$this->table_name,
 				'id'
 			);
-			$where             = implode( '', $meta_query );
+
+			$where = implode( '', $meta_query );
 		}
 
-		$where .= 'WHERE 1=1';
+		$where .= 'WHERE 1=1 ';
 		$where .= $this->get_where_search();
 		$where .= $this->get_where_email();
 		$where .= $this->get_where_donor();
 		$where .= $this->get_where_user();
 		$where .= $this->get_where_date();
 
-		return $where;
+		return trim( $where );
+		
 	}
 
 	/**
@@ -269,9 +287,9 @@ class Give_Donors_Query {
 				$emails_placeholder = array_fill( 0, $emails_count, '%s' );
 				$emails             = implode( ', ', $emails_placeholder );
 
-				$where .= $wpdb->prepare( " AND {$this->table_name}.email IN( $emails ) ", $this->args['email'] );
+				$where .= $wpdb->prepare( "AND {$this->table_name}.email IN( $emails )", $this->args['email'] );
 			} else {
-				$where .= $wpdb->prepare( " AND {$this->table_name}.email = %s ", $this->args['email'] );
+				$where .= $wpdb->prepare( "AND {$this->table_name}.email = %s", $this->args['email'] );
 			}
 		}
 
@@ -295,9 +313,9 @@ class Give_Donors_Query {
 			if ( ! is_array( $this->args['donor'] ) ) {
 				$this->args['donor'] = explode( ',', $this->args['donor'] );
 			}
-			$log_ids = implode( ',', array_map( 'intval', $this->args['donor'] ) );
+			$donor_ids = implode( ',', array_map( 'intval', $this->args['donor'] ) );
 
-			$where .= " AND {$this->table_name}.id IN( {$log_ids} ) ";
+			$where .= "AND {$this->table_name}.id IN( {$donor_ids} )";
 		}
 
 		return $where;
@@ -318,11 +336,23 @@ class Give_Donors_Query {
 		// Donors created for a specific date or in a date range
 		if ( ! empty( $this->args['date_query'] ) ) {
 			$date_query_object = new WP_Date_Query(
-				$this->args['date_query'],
+				is_array( $this->args['date_query'] ) ? $this->args['date_query'] : wp_parse_args( $this->args['date_query'] ),
 				"{$this->table_name}.date_created"
 			);
 
-			$where .= $date_query_object->get_sql();
+			$where .= str_replace(
+				array(
+					"\n",
+					'(   (',
+					'))',
+				),
+				array(
+					'',
+					'( (',
+					') )',
+				),
+				$date_query_object->get_sql()
+			);
 		}
 
 		return $where;
@@ -347,11 +377,11 @@ class Give_Donors_Query {
 			if ( ! empty( $search_parts[0] ) ) {
 				switch ( $search_parts[0] ) {
 					case 'name':
-						$where = " AND {$this->table_name}.name LIKE '%{$search_parts[1]}%' ";
+						$where = "AND {$this->table_name}.name LIKE '%{$search_parts[1]}%'";
 						break;
 
 					case 'note':
-						$where = " AND {$this->table_name}.notes LIKE '%{$search_parts[1]}%' ";
+						$where = "AND {$this->table_name}.notes LIKE '%{$search_parts[1]}%'";
 						break;
 				}
 			}
@@ -379,7 +409,7 @@ class Give_Donors_Query {
 			}
 			$user_ids = implode( ',', array_map( 'intval', $this->args['user'] ) );
 
-			$where .= " AND {$this->table_name}.user_id IN( {$user_ids} ) ";
+			$where .= "AND {$this->table_name}.user_id IN( {$user_ids} )";
 		}
 
 		return $where;

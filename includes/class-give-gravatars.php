@@ -94,15 +94,16 @@ class Give_Donors_Gravatars {
 		$hashkey = md5( strtolower( trim( $email ) ) );
 		$uri     = 'http://www.gravatar.com/avatar/' . $hashkey . '?d=404';
 
-		$data = wp_cache_get( $hashkey );
-		if ( false === $data ) {
+		$data = Give_Cache::get_group( $hashkey );
+
+		if ( is_null( $data ) ) {
 			$response = wp_remote_head( $uri );
 			if ( is_wp_error( $response ) ) {
 				$data = 'not200';
 			} else {
 				$data = $response['response']['code'];
 			}
-			wp_cache_set( $hashkey, $data, $group = '', $expire = 60 * 5 );
+			Give_Cache::set_group( $hashkey, $data, $group = '', $expire = 60 * 5 );
 
 		}
 		if ( $data == '200' ) {
@@ -123,12 +124,8 @@ class Give_Donors_Gravatars {
 	 * @return array        IDs if logs, false otherwise
 	 */
 	public function get_log_ids( $form_id = '' ) {
-
-		// get Give_Logging class
-		global $give_logs;
-
 		// get log for this form
-		$logs = $give_logs->get_logs( $form_id );
+		$logs = Give()->logs->get_logs( $form_id );
 
 		if ( $logs ) {
 			$log_ids = array();
@@ -175,7 +172,7 @@ class Give_Donors_Gravatars {
 
 			foreach ( $payment_ids as $key => $id ) {
 
-				$email = give_get_meta( $id, '_give_payment_user_email', true );
+				$email = give_get_meta( $id, '_give_payment_donor_email', true );
 
 				if ( isset ( $give_options['give_donors_gravatars_has_gravatar_account'] ) ) {
 					if ( ! $this->validate_gravatar( $email ) ) {
@@ -183,7 +180,7 @@ class Give_Donors_Gravatars {
 					}
 				}
 
-				$unique_emails[ $id ] = give_get_meta( $id, '_give_payment_user_email', true );
+				$unique_emails[ $id ] = give_get_meta( $id, '_give_payment_donor_email', true );
 
 			}
 
@@ -249,9 +246,9 @@ class Give_Donors_Gravatars {
 		if ( isset ( $title ) ) {
 
 			if ( $title ) {
-				echo apply_filters( 'give_donors_gravatars_title', '<h3 class="give-gravatars-title">' . esc_attr( $title ) . '</h3>' );
+				echo wp_kses_post( apply_filters( 'give_donors_gravatars_title', '<h3 class="give-gravatars-title">' . esc_attr( $title ) . '</h3>' ) );
 			} elseif ( isset( $give_options['give_donors_gravatars_heading'] ) ) {
-				echo apply_filters( 'give_donors_gravatars_title', '<h3 class="give-gravatars-title">' . esc_attr( $give_options['give_donors_gravatars_heading'] ) . '</h2>' );
+				echo wp_kses_post( apply_filters( 'give_donors_gravatars_title', '<h3 class="give-gravatars-title">' . esc_attr( $give_options['give_donors_gravatars_heading'] ) . '</h2>' ) );
 			}
 
 		}
@@ -275,7 +272,7 @@ class Give_Donors_Gravatars {
 				$name = $user_info['first_name'];
 
 				// get donor's email
-				$email = give_get_meta( $id, '_give_payment_user_email', true );
+				$email = give_get_meta( $id, '_give_payment_donor_email', true );
 
 				// set gravatar size and provide filter
 				$size = isset( $give_options['give_donors_gravatars_gravatar_size'] ) ? apply_filters( 'give_donors_gravatars_gravatar_size', $give_options['give_donors_gravatars_gravatar_size'] ) : '';
@@ -294,7 +291,7 @@ class Give_Donors_Gravatars {
 			} // end foreach
 		}
 
-		echo $output;
+		echo wp_kses_post( $output );
 		echo '</ul>';
 		echo '</div>';
 
@@ -462,8 +459,14 @@ class Give_Donors_Gravatars_Widget extends WP_Widget {
 	 */
 	public function widget( $args, $instance ) {
 
-		//@TODO: Don't extract it!!!
-		extract( $args );
+		$defaults = array(
+			'before_widget' => '',
+			'after_widget' => '',
+			'before_title' => '',
+			'after_title' => '',
+		);
+
+		$args = wp_parse_args( $args, $defaults );
 
 		if ( ! is_singular( 'give_forms' ) ) {
 			return;
@@ -472,21 +475,24 @@ class Give_Donors_Gravatars_Widget extends WP_Widget {
 		// Variables from widget settings
 		$title = apply_filters( 'widget_title', $instance['title'] );
 
+		$output = '';
+
 		// Used by themes. Opens the widget
-		echo $before_widget;
+		$output .= $args['before_widget'];
 
 		// Display the widget title
 		if ( $title ) {
-			echo $before_title . $title . $after_title;
+			$output .= $args['before_title'] . $title . $args['after_title'];
 		}
 
 		$gravatars = new Give_Donors_Gravatars();
 
-		echo $gravatars->gravatars( get_the_ID(), null ); // remove title
+		$output .= $gravatars->gravatars( get_the_ID(), null ); // remove title
 
 		// Used by themes. Closes the widget
-		echo $after_widget;
+		$output .= $args['after_widget'];
 
+		echo wp_kses_post( $output );
 	}
 
 	/**
@@ -506,7 +512,7 @@ class Give_Donors_Gravatars_Widget extends WP_Widget {
 
 		$instance = $old_instance;
 
-		$instance['title'] = strip_tags( $new_instance['title'] );
+		$instance['title'] = wp_strip_all_tags( $new_instance['title'] );
 
 		return $instance;
 
@@ -535,8 +541,8 @@ class Give_Donors_Gravatars_Widget extends WP_Widget {
 
 		<!-- Title -->
 		<p>
-			<label for="<?php echo $this->get_field_id( 'title' ); ?>"><?php esc_html_e( 'Title:', 'give' ) ?></label>
-			<input class="widefat" id="<?php echo $this->get_field_id( 'title' ); ?>" name="<?php echo $this->get_field_name( 'title' ); ?>" type="text" value="<?php echo $instance['title']; ?>" />
+			<label for="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>"><?php esc_html_e( 'Title:', 'give' ) ?></label>
+			<input class="widefat" id="<?php echo esc_attr( $this->get_field_id( 'title' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'title' ) ); ?>" type="text" value="<?php echo esc_attr( $instance['title'] ); ?>" />
 		</p>
 
 		<?php

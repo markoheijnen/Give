@@ -60,7 +60,6 @@ function give_post_actions() {
 
 	$_post_action = ! empty( $_POST['give_action'] ) ? $_POST['give_action'] : null;
 
-
 	// Add backward compatibility to give-action param ( $_POST ).
 	if ( empty( $_post_action ) ) {
 		$_post_action = ! empty( $_POST['give-action'] ) ? $_POST['give-action'] : null;
@@ -84,10 +83,10 @@ add_action( 'init', 'give_post_actions' );
 /**
  * Connect WordPress user with Donor.
  *
- * @since  1.7
+ * @param  int   $user_id   User ID.
+ * @param  array $user_data User Data.
  *
- * @param  int   $user_id   User ID
- * @param  array $user_data User Data
+ * @since  1.7
  *
  * @return void
  */
@@ -104,11 +103,12 @@ function give_connect_donor_to_wpuser( $user_id, $user_data ) {
 			$donor->add_note( $donor_note );
 
 			// Update user_id meta in payments.
-			if ( ! empty( $donor->payment_ids ) && ( $donations = explode( ',', $donor->payment_ids ) ) ) {
-				foreach ( $donations as $donation ) {
-					give_update_meta( $donation, '_give_payment_user_id', $user_id );
-				}
-			}
+			// if( ! empty( $donor->payment_ids ) && ( $donations = explode( ',', $donor->payment_ids ) ) ) {
+			// 	foreach ( $donations as $donation  ) {
+			// 		give_update_meta( $donation, '_give_payment_user_id', $user_id );
+			// 	}
+			// }
+			// Do not need to update user_id in payment because we will get user id from donor id now.
 		}
 	}
 }
@@ -132,12 +132,12 @@ function give_validate_license_when_site_migrated() {
 	$home_url                    .= isset( $home_url_parts['path'] ) ? $home_url_parts['path'] : '';
 	$site_address_before_migrate = get_option( 'give_site_address_before_migrate' );
 
-	// Need $home_url to proceed
+	// Need $home_url to proceed.
 	if ( ! $home_url ) {
 		return;
 	}
 
-	// Save site address
+	// Save site address.
 	if ( ! $site_address_before_migrate ) {
 		// Update site address.
 		update_option( 'give_site_address_before_migrate', $home_url );
@@ -149,6 +149,7 @@ function give_validate_license_when_site_migrated() {
 	if ( strpos( $site_address_before_migrate, 'http' ) ) {
 		$site_address_before_migrate = parse_url( $site_address_before_migrate );
 		$site_address_before_migrate = isset( $site_address_before_migrate['host'] ) ? $site_address_before_migrate['host'] : false;
+
 		// Add path for multisite installs.
 		$site_address_before_migrate .= isset( $site_address_before_migrate['path'] ) ? $site_address_before_migrate['path'] : '';
 	}
@@ -245,8 +246,7 @@ add_action( 'admin_head', 'give_admin_quick_css' );
 /**
  * Set Donation Amount for Multi Level Donation Forms
  *
- * @param int    $form_id
- * @param object $form
+ * @param int $form_id Donation Form ID.
  *
  * @since 1.8.9
  *
@@ -271,9 +271,64 @@ function give_set_donation_levels_max_min_amount( $form_id ) {
 	$min_amount = min( $donation_levels_amounts );
 	$max_amount = max( $donation_levels_amounts );
 
-	// Set Minimum and Maximum amount for Multi Level Donation Forms
+	// Set Minimum and Maximum amount for Multi Level Donation Forms.
 	give_update_meta( $form_id, '_give_levels_minimum_amount', $min_amount ? give_sanitize_amount_for_db( $min_amount ) : 0 );
 	give_update_meta( $form_id, '_give_levels_maximum_amount', $max_amount ? give_sanitize_amount_for_db( $max_amount ) : 0 );
 }
 
 add_action( 'give_pre_process_give_forms_meta', 'give_set_donation_levels_max_min_amount', 30 );
+
+
+/**
+ * Save donor address when donation complete
+ *
+ * @since 2.0
+ *
+ * @param int $payment_id
+ */
+function _give_save_donor_billing_address( $payment_id ) {
+	$donor_id  = absint( give_get_payment_donor_id( $payment_id ));
+
+	// Bailout
+	if ( ! $donor_id ) {
+		return;
+	}
+
+
+	/* @var Give_Donor $donor */
+	$donor = new Give_Donor( $donor_id );
+
+	// Save address.
+	$donor->add_address( 'billing[]', give_get_donation_address( $payment_id ) );
+}
+
+add_action( 'give_complete_donation', '_give_save_donor_billing_address', 9999 );
+
+
+/**
+ * Update form id in payment logs
+ *
+ * @since 2.0
+ *
+ * @param array $args
+ */
+function give_update_log_form_id( $args ) {
+	$new_form_id = absint( $args[0] );
+	$payment_id  = absint( $args[1] );
+	$logs        = Give()->logs->get_logs( $payment_id );
+
+	// Bailout.
+	if ( empty( $logs ) ) {
+		return;
+	}
+
+	/* @var object $log */
+	foreach ( $logs as $log ) {
+		Give()->logs->logmeta_db->update_meta( $log->ID, '_give_log_form_id', $new_form_id );
+	}
+
+	// Delete cache.
+	Give()->logs->delete_cache();
+}
+
+add_action( 'give_update_log_form_id', 'give_update_log_form_id' );
