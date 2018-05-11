@@ -408,7 +408,7 @@ class Give_Session {
 		// PHP Sessions.
 		if (
 			( $this->use_php_sessions && $_COOKIE['PHPSESSID'] ) ||
-			( ! $this->use_php_sessions && $_COOKIE[WP_SESSION_COOKIE])
+			( ! $this->use_php_sessions && isset($_COOKIE[WP_SESSION_COOKIE]) && $_COOKIE[WP_SESSION_COOKIE])
 		) {
 
 			return true;
